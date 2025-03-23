@@ -14,7 +14,9 @@ app_state_t g_AppState = {
     .verbose_flag = 0,
     .input_files = NULL,
     .size_files = 0,
-    .output_file = "./out.txt"
+    .output_file = "./out.txt",
+    .results = {},
+    .results_counter = 0,
 };
 
 // ------------------------------
@@ -89,6 +91,10 @@ void DisplayHelp() {
 
 void FinalizeTesting() {
     free(g_AppState.input_files);
+
+    for (size_t idx = 0; idx < g_AppState.results_counter; ++idx) {
+        CleanupResults(g_AppState.results + idx);
+    }
 }
 
 void RunTests() {
@@ -112,4 +118,28 @@ void FailApplication(const char* msg) {
     fprintf(stderr, "[ ERROR ] Application failed due to error: %s\n", msg);
     DisplayHelp();
     exit(EXIT_FAILURE);
+}
+
+void DisplayResults(FILE file, test_result_t *results, size_t results_size) {
+
+}
+
+void CleanupResults(test_result_t *result) {
+    /* CleanupResults error logs */
+    for (size_t idx = 0; idx < result->error_logs_counter; ++idx) {
+        free(result->error_logs[idx].value);
+        result->error_logs[idx].value = NULL;
+    }
+}
+
+void AddErrorLog(test_result_t *result, error_log_t log) {
+    
+}
+
+void AddDataMeasurement(test_result_t *result, time_measurement_t measurement) {
+
+}
+
+test_result_t *AllocResults() {
+    return &g_AppState.results[g_AppState.results_counter++];
 }
