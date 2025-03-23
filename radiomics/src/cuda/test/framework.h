@@ -15,7 +15,7 @@ typedef struct app_state {
 
 void ParseCLI(int argc, const char** argv);
 
-void FailApplication();
+void FailApplication(const char* msg);
 
 int IsVerbose();
 
