@@ -1,6 +1,9 @@
-#include <stdio.h>
+#include <framework.h>
 
-int main() {
-    printf("Hello Word!\n");
+int main(const int argc, const char** argv) {
+    ParseCLI(argc, argv);
+    RunTests();
+    FinalizeTesting();
+
     return 0;
 }
