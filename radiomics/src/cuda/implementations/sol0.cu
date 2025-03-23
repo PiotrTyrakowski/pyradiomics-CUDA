@@ -1,5 +1,5 @@
 #include "test.cuh"
 
-DEF_SOLUTION(0) {
+SOLUTION_DECL(0) {
     return 0;
 }

@@ -26,7 +26,6 @@ void RunTest_(const char* input) {
 
     for (size_t idx = 0; idx < MAX_SOL_FUNCTIONS; ++idx) {
         if (g_ShapeFunctions[idx] == NULL) {
-            printf("%lu\n", idx);
             continue;
         }
 
@@ -56,7 +55,7 @@ void ParseCLI(int argc, const char **argv) {
             }
 
             g_AppState.size_files = 0;
-            g_AppState.input_files = malloc(sizeof(char*) * (argc - i - 1));
+            g_AppState.input_files = (const char**)malloc(sizeof(char*) * (argc - i - 1));
 
             while (i + 1 < argc && argv[i + 1][0] != '-') {
                 g_AppState.input_files[g_AppState.size_files++] = argv[++i];
@@ -93,6 +92,8 @@ void FinalizeTesting() {
 }
 
 void RunTests() {
+    RegisterSolutions();
+
     if (IsVerbose()) {
         printf("Running tests in verbose mode...\n");
         printf("Processing %zu input files...\n", g_AppState.size_files);
