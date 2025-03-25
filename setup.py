@@ -2,6 +2,7 @@
 
 from distutils import sysconfig
 import platform
+import os
 
 import numpy
 from setuptools import Extension, setup
@@ -12,6 +13,7 @@ if platform.architecture()[0].startswith('32'):
 
 commands = versioneer.get_cmdclass()
 incDirs = [sysconfig.get_python_inc(), numpy.get_include()]
+          
 
 ext = [Extension("radiomics._cmatrices", ["radiomics/src/_cmatrices.c", "radiomics/src/cmatrices.c"],
                  include_dirs=incDirs),
