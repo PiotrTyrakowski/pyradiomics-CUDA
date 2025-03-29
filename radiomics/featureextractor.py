@@ -439,13 +439,10 @@ class RadiomicsFeatureExtractor:
 
       shapeClass = getFeatureClasses()[shape_type](croppedImage, croppedMask, **kwargs)
       # TODO: PIOTR remove this code from working version
-      # Write shape feature values to a text file
-      with open('shape_features.txt', 'w') as f:
-        f.write(f"Surface Area: {shapeClass.SurfaceArea}\n")
-        f.write(f"Volume: {shapeClass.Volume}\n")
-        f.write(f"Diameters: {shapeClass.diameters}\n")
-        f.write(f"Mask Array Shape: {shapeClass.maskArray.shape}\n")
-        f.write(f"Pixel Spacing: {shapeClass.pixelSpacing}\n")
+      # Write shape class atributes to a text file
+
+      from radiomics.cuda.helpers.shape_class_handlers import write_shape_class_to_file
+      write_shape_class_to_file(shapeClass)
 
       if featureNames is not None:
         for feature in featureNames:
