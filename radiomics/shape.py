@@ -41,6 +41,10 @@ class RadiomicsShape(base.RadiomicsFeaturesBase):
     assert inputMask.GetDimension() == 3, 'Shape features are only available in 3D. If 2D, use shape2D instead'
     super(RadiomicsShape, self).__init__(inputImage, inputMask, **kwargs)
 
+    # Check if the cShape module was loaded successfully
+    if cShape is None:
+        raise RuntimeError('Shape features require the C Shape extension module, which could not be loaded.')
+
   def _initVoxelBasedCalculation(self):
     raise NotImplementedError('Shape features are not available in voxel-based mode')
 
@@ -70,9 +74,8 @@ class RadiomicsShape(base.RadiomicsFeaturesBase):
 
     self.logger.debug('Pre-calculate Volume, Surface Area and Eigenvalues')
 
-    # Volume, Surface Area and eigenvalues are pre-calculated
-
-    # Compute Surface Area and volume
+    # Compute Surface Area, Volume, and Diameters using the imported cShape module
+    # This will now call either the CPU or GPU version based on __init__.py
     self.SurfaceArea, self.Volume, self.diameters = cShape.calculate_coefficients(self.maskArray, self.pixelSpacing)
 
     # Compute eigenvalues and -vectors

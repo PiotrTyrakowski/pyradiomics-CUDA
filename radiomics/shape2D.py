@@ -47,6 +47,9 @@ class RadiomicsShape2D(base.RadiomicsFeaturesBase):
 
   def __init__(self, inputImage, inputMask, **kwargs):
     super(RadiomicsShape2D, self).__init__(inputImage, inputMask, **kwargs)
+    # Check if the cShape module was loaded successfully
+    if cShape is None:
+        raise RuntimeError('Shape features require the C Shape extension module, which could not be loaded.')
 
   def _initVoxelBasedCalculation(self):
     raise NotImplementedError('Shape features are not available in pixel-based mode')
@@ -240,7 +243,7 @@ class RadiomicsShape2D(base.RadiomicsFeaturesBase):
     It therefore takes spacing into account, but does not make use of the shape mesh.
     """
     if self.eigenValues[1] < 0:
-      self.logger.warning('Major axis eigenvalue negative! (%g)', self.eigenValues[1])
+      logger.warning('Major axis eigenvalue negative! (%g)', self.eigenValues[1])
       return numpy.nan
     return numpy.sqrt(self.eigenValues[1]) * 4
 
@@ -258,7 +261,7 @@ class RadiomicsShape2D(base.RadiomicsFeaturesBase):
     It therefore takes spacing into account, but does not make use of the shape mesh.
     """
     if self.eigenValues[0] < 0:
-      self.logger.warning('Minor axis eigenvalue negative! (%g)', self.eigenValues[0])
+      logger.warning('Minor axis eigenvalue negative! (%g)', self.eigenValues[0])
       return numpy.nan
     return numpy.sqrt(self.eigenValues[0]) * 4
 
@@ -281,6 +284,6 @@ class RadiomicsShape2D(base.RadiomicsFeaturesBase):
     It therefore takes spacing into account, but does not make use of the shape mesh.
     """
     if self.eigenValues[0] < 0 or self.eigenValues[1] < 0:
-      self.logger.warning('Elongation eigenvalue negative! (%g, %g)', self.eigenValues[0], self.eigenValues[1])
+      logger.warning('Elongation eigenvalue negative! (%g, %g)', self.eigenValues[0], self.eigenValues[1])
       return numpy.nan
     return numpy.sqrt(self.eigenValues[0] / self.eigenValues[1])
