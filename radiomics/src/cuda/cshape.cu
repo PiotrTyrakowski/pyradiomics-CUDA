@@ -296,7 +296,7 @@ __global__ void calculate_coefficients_kernel(
   double new_vertices_local[3 * 3]; // Max 3 vertices * 3 coordinates
 
   // Check point 7 (edge 6)
-  if (original_cube_idx & (1 << 7)) {
+  if (original_cube_idx & (1 << 6)) {
     int edge_idx = 6;
     new_vertices_local[num_new_vertices * 3 + 0] =
         (((double)iz) + d_vertList[edge_idx][0]) * spacing[0];
@@ -307,7 +307,7 @@ __global__ void calculate_coefficients_kernel(
     num_new_vertices++;
   }
   // Check point 5 (edge 7)
-  if (original_cube_idx & (1 << 5)) {
+  if (original_cube_idx & (1 << 4)) {
     int edge_idx = 7;
     new_vertices_local[num_new_vertices * 3 + 0] =
         (((double)iz) + d_vertList[edge_idx][0]) * spacing[0];
@@ -318,7 +318,7 @@ __global__ void calculate_coefficients_kernel(
     num_new_vertices++;
   }
   // Check point 4 (edge 11)
-  if (original_cube_idx & (1 << 4)) {
+  if (original_cube_idx & (1 << 3)) {
     int edge_idx = 11;
     new_vertices_local[num_new_vertices * 3 + 0] =
         (((double)iz) + d_vertList[edge_idx][0]) * spacing[0];
