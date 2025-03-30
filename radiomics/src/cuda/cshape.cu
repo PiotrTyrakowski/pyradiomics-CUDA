@@ -278,7 +278,6 @@ __global__ void calculate_coefficients_kernel(
 
   // --- Symmetry Optimization & Skipping ---
   int sign_correction = 1;
-  unsigned char original_cube_idx = cube_idx; // Keep original for vertex check
   if (cube_idx & 0x80) {  // If the 8th bit (corresponding to point p7) is set
     cube_idx ^= 0xff;     // Flip all bits
     sign_correction = -1; // Correct sign for volume calculation
@@ -290,13 +289,13 @@ __global__ void calculate_coefficients_kernel(
   }
 
   // --- Store Vertices for Diameter Calculation ---
-  // Store vertices on edges 6, 7, 11 if the corresponding *original* points 7,
-  // 5, 4 are set
+  // Store vertices on edges 6, 7, 11 if the corresponding points (bits 6, 4, 3)
+  // are set in the *potentially flipped* cube_idx, matching the C code logic.
   int num_new_vertices = 0;
   double new_vertices_local[3 * 3]; // Max 3 vertices * 3 coordinates
 
-  // Check point 7 (edge 6)
-  if (original_cube_idx & (1 << 6)) {
+  // Check bit 6 (original point p6, edge 6) using potentially flipped cube_idx
+  if (cube_idx & (1 << 6)) {
     int edge_idx = 6;
     new_vertices_local[num_new_vertices * 3 + 0] =
         (((double)iz) + d_vertList[edge_idx][0]) * spacing[0];
@@ -306,9 +305,9 @@ __global__ void calculate_coefficients_kernel(
         (((double)ix) + d_vertList[edge_idx][2]) * spacing[2];
     num_new_vertices++;
   }
-  // Check point 5 (edge 7)
-  if (original_cube_idx & (1 << 4)) {
-    int edge_idx = 7;
+  // Check bit 4 (original point p4, edge 7) using potentially flipped cube_idx
+  if (cube_idx & (1 << 4)) { // Corresponds to points_edges[0][1] in C code
+    int edge_idx = 7;        // Corresponds to points_edges[1][1] in C code
     new_vertices_local[num_new_vertices * 3 + 0] =
         (((double)iz) + d_vertList[edge_idx][0]) * spacing[0];
     new_vertices_local[num_new_vertices * 3 + 1] =
@@ -317,9 +316,9 @@ __global__ void calculate_coefficients_kernel(
         (((double)ix) + d_vertList[edge_idx][2]) * spacing[2];
     num_new_vertices++;
   }
-  // Check point 4 (edge 11)
-  if (original_cube_idx & (1 << 3)) {
-    int edge_idx = 11;
+  // Check bit 3 (original point p3, edge 11) using potentially flipped cube_idx
+  if (cube_idx & (1 << 3)) { // Corresponds to points_edges[0][2] in C code
+    int edge_idx = 11;       // Corresponds to points_edges[1][2] in C code
     new_vertices_local[num_new_vertices * 3 + 0] =
         (((double)iz) + d_vertList[edge_idx][0]) * spacing[0];
     new_vertices_local[num_new_vertices * 3 + 1] =
