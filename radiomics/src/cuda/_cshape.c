@@ -177,6 +177,11 @@ static PyObject *cshape_calculate_coefficients_cuda(PyObject *self,
   mask_host = (char *)PyArray_DATA(mask_arr);
   spacing_host = (double *)PyArray_DATA(spacing_arr);
 
+  // *** ADD THIS DEBUG PRINT ***
+  fprintf(stderr, "DEBUG: About to call CUDA calculate_coefficients...\n");
+  fflush(stderr);
+  // ***************************
+
   // 5. Call the CUDA wrapper function (Release GIL during compute)
   Py_BEGIN_ALLOW_THREADS cuda_status =
       calculate_coefficients(mask_host, size, strides, spacing_host, &results);
@@ -184,7 +189,8 @@ static PyObject *cshape_calculate_coefficients_cuda(PyObject *self,
 
       // Check status code from CUDA wrapper
       if (cuda_status != 0) {
-    // Use the helper function to get a descriptive CUDA error
+    fprintf(stderr, "DEBUG: Received non-zero cuda_status: %d\n", cuda_status);
+    fflush(stderr);
     PyErr_Format(PyExc_RuntimeError, "CUDA Shape calculation failed: %s",
                  cuda_get_last_error_string());
     goto cuda_error;
@@ -257,12 +263,20 @@ static PyObject *cshape_calculate_coefficients2D_cuda(PyObject *self,
   mask_host = (char *)PyArray_DATA(mask_arr);
   spacing_host = (double *)PyArray_DATA(spacing_arr);
 
+  // *** ADD THIS DEBUG PRINT ***
+  fprintf(stderr, "DEBUG: About to call CUDA calculate_coefficients2D...\n");
+  fflush(stderr);
+  // ***************************
+
   // 5. Call the CUDA wrapper function (Release GIL)
   Py_BEGIN_ALLOW_THREADS cuda_status = calculate_coefficients2D(
       mask_host, size, strides, spacing_host, &results);
   Py_END_ALLOW_THREADS
 
       if (cuda_status != 0) {
+    fprintf(stderr, "DEBUG: Received non-zero cuda_status (2D): %d\n",
+            cuda_status);
+    fflush(stderr);
     PyErr_Format(PyExc_RuntimeError, "CUDA 2D Shape calculation failed: %s",
                  cuda_get_last_error_string());
     goto cuda2d_error;
