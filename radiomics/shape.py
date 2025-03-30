@@ -1,5 +1,6 @@
 import numpy
 import SimpleITK as sitk
+import numpy as np
 
 from radiomics import base, cShape, deprecated
 
@@ -74,9 +75,34 @@ class RadiomicsShape(base.RadiomicsFeaturesBase):
 
     self.logger.debug('Pre-calculate Volume, Surface Area and Eigenvalues')
 
-    # Compute Surface Area, Volume, and Diameters using the imported cShape module
-    # This will now call either the CPU or GPU version based on __init__.py
-    self.SurfaceArea, self.Volume, self.diameters = cShape.calculate_coefficients(self.maskArray, self.pixelSpacing)
+    # Cast mask to int8
+    maskArray_int8 = self.maskArray.astype(np.int8)
+    # Explicitly create a C-ordered copy
+    maskArray_copy = maskArray_int8.copy(order='C')
+
+    # Ensure pixel spacing is float64 and also create a C-ordered copy
+    # (Just to be consistent, though less likely to be the issue)
+    pixelSpacing_float64 = self.pixelSpacing.astype(np.float64)
+    pixelSpacing_copy = pixelSpacing_float64.copy(order='C')
+
+    # --- Debugging Prints (keep them) ---
+    self.logger.info(f"maskArray_copy flags: {maskArray_copy.flags}") # Check flags of the copy
+    self.logger.info(f"maskArray_copy shape: {maskArray_copy.shape}")
+    self.logger.info(f"maskArray_copy dtype: {maskArray_copy.dtype}") # Should be int8
+    self.logger.info(f"pixelSpacing_copy flags: {pixelSpacing_copy.flags}") # Check flags of the copy
+    self.logger.info(f"pixelSpacing_copy shape: {pixelSpacing_copy.shape}")
+    self.logger.info(f"pixelSpacing_copy dtype: {pixelSpacing_copy.dtype}") # Should be float64
+    self.logger.info(f"Using cShape module: {cShape}")
+    # --- End Debugging Prints ---
+
+    # Pass the explicit C-ordered copies to the C/CUDA extension
+    try:
+        # Use the copied arrays
+        self.SurfaceArea, self.Volume, self.diameters = cShape.calculate_coefficients(maskArray_copy, pixelSpacing_copy)
+    except (ValueError, TypeError) as e:
+        self.logger.error(f"Error calling cShape.calculate_coefficients: {e}")
+        # Re-raising the error
+        raise e
 
     # Compute eigenvalues and -vectors
     Np = len(self.labelledVoxelCoordinates[0])

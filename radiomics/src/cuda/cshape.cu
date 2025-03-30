@@ -603,9 +603,10 @@ __global__ void calculate_meshDiameter2D_kernel(
 // --- Wrapper Functions (Host Code) ---
 
 // Wrapper for 3D CUDA Calculation
-extern "C" int launch_calculate_coefficients_cuda(
-    const char *mask_host, const int *size, const int *strides_host,
-    const double *spacing_host, ShapeCoefficients3D *results) {
+extern "C" int calculate_coefficients(const char *mask_host, const int *size,
+                                      const int *strides_host,
+                                      const double *spacing_host,
+                                      ShapeCoefficients3D *results) {
   cudaError_t cudaStatus = cudaSuccess;
 
   // --- Device Memory Pointers ---
@@ -625,16 +626,26 @@ extern "C" int launch_calculate_coefficients_cuda(
   unsigned long long vertex_count_host = 0;
   double diameters_sq_host[4] = {0.0, 0.0, 0.0, 0.0};
 
+  // --- Recalculate Host Strides (Assuming C-contiguous char mask) ---
+  int calculated_strides_host[3];
+  calculated_strides_host[2] =
+      sizeof(char); // Stride for the last dimension (ix)
+  calculated_strides_host[1] =
+      size[2] *
+      calculated_strides_host[2]; // Stride for the middle dimension (iy)
+  calculated_strides_host[0] =
+      size[1] *
+      calculated_strides_host[1]; // Stride for the first dimension (iz)
+  // --- End Recalculation ---
+
   // --- Determine Allocation Sizes ---
   size_t mask_elements = (size_t)size[0] * size[1] * size[2];
   size_t mask_size_bytes = mask_elements * sizeof(char);
-  // Estimate max vertices: 3 per cube * number of cubes
   size_t num_cubes = (size_t)(size[0] - 1) * (size[1] - 1) * (size[2] - 1);
   size_t max_possible_vertices = num_cubes * 3;
   if (max_possible_vertices == 0)
-    max_possible_vertices = 1; // Avoid zero allocation size
-  size_t vertices_bytes =
-      max_possible_vertices * 3 * sizeof(double); // 3 coordinates
+    max_possible_vertices = 1;
+  size_t vertices_bytes = max_possible_vertices * 3 * sizeof(double);
 
   // --- 1. Allocate GPU Memory ---
   cudaStatus = cudaMalloc((void **)&mask_dev, mask_size_bytes);
@@ -679,8 +690,6 @@ extern "C" int launch_calculate_coefficients_cuda(
   cudaStatus = cudaMemset(diameters_sq_dev, 0, 4 * sizeof(double));
   if (cudaStatus != cudaSuccess)
     goto cleanup;
-  // vertices_dev does not need initialization as it's write-only in the first
-  // kernel
 
   // --- 3. Copy Input Data from Host to Device ---
   cudaStatus =
@@ -691,8 +700,7 @@ extern "C" int launch_calculate_coefficients_cuda(
       cudaMemcpy(size_dev, size, 3 * sizeof(int), cudaMemcpyHostToDevice);
   if (cudaStatus != cudaSuccess)
     goto cleanup;
-  // Assuming strides_host contains element strides, matching kernel expectation
-  cudaStatus = cudaMemcpy(strides_dev, strides_host, 3 * sizeof(int),
+  cudaStatus = cudaMemcpy(strides_dev, calculated_strides_host, 3 * sizeof(int),
                           cudaMemcpyHostToDevice);
   if (cudaStatus != cudaSuccess)
     goto cleanup;
@@ -702,25 +710,19 @@ extern "C" int launch_calculate_coefficients_cuda(
     goto cleanup;
 
   // --- 4. Launch Marching Cubes Kernel ---
-  if (num_cubes > 0) {       // Only launch if there are cubes to process
-    dim3 blockSize(8, 8, 8); // 512 threads per block (adjust as needed)
-    dim3 gridSize(
-        (size[2] - 1 + blockSize.x - 1) / blockSize.x, // Grid size based on Nx
-        (size[1] - 1 + blockSize.y - 1) / blockSize.y, // Grid size based on Ny
-        (size[0] - 1 + blockSize.z - 1) / blockSize.z  // Grid size based on Nz
-    );
+  if (num_cubes > 0) {
+    dim3 blockSize(8, 8, 8);
+    dim3 gridSize((size[2] - 1 + blockSize.x - 1) / blockSize.x,
+                  (size[1] - 1 + blockSize.y - 1) / blockSize.y,
+                  (size[0] - 1 + blockSize.z - 1) / blockSize.z);
 
     calculate_coefficients_kernel<<<gridSize, blockSize>>>(
         mask_dev, size_dev, strides_dev, spacing_dev, surfaceArea_dev,
         volume_dev, vertices_dev, vertex_count_dev, max_possible_vertices);
 
-    // Check for kernel launch errors
     cudaStatus = cudaGetLastError();
     if (cudaStatus != cudaSuccess)
       goto cleanup;
-    // Optional: Synchronize to ensure kernel completion before proceeding
-    // cudaStatus = cudaDeviceSynchronize(); if(cudaStatus != cudaSuccess) goto
-    // cleanup;
   }
 
   // --- 5. Copy Results (SA, Volume, vertex count) back to Host ---
@@ -738,53 +740,44 @@ extern "C" int launch_calculate_coefficients_cuda(
     goto cleanup;
 
   // Final adjustments and storing results
-  results->volume = volume_host / 6.0; // Volume requires division by 6
+  results->volume = volume_host / 6.0;
   results->surfaceArea = surfaceArea_host;
-  results->vertex_count = (size_t)vertex_count_host; // Store actual count
+  results->vertex_count = (size_t)vertex_count_host;
 
-  // Check if vertex buffer might have overflowed (actual count > allocated)
+  // Check if vertex buffer might have overflowed
   if (vertex_count_host > max_possible_vertices) {
     fprintf(stderr,
             "Warning: CUDA vertex buffer potentially overflowed (3D). Needed: "
             "%llu, Allocated: %llu. Diameter results might be based on "
             "incomplete data.\n",
             vertex_count_host, (unsigned long long)max_possible_vertices);
-    // Clamp count to the allocated size for the diameter kernel
     vertex_count_host = max_possible_vertices;
   }
 
   // --- 6. Launch Diameter Kernel (only if vertices were generated) ---
   if (vertex_count_host > 0) {
     size_t num_vertices_actual = (size_t)vertex_count_host;
-    int threadsPerBlock_diam = 256; // Adjust as needed
-    // Grid size based on the actual number of vertices found
+    int threadsPerBlock_diam = 256;
     int numBlocks_diam =
         (num_vertices_actual + threadsPerBlock_diam - 1) / threadsPerBlock_diam;
 
     calculate_meshDiameter_kernel<<<numBlocks_diam, threadsPerBlock_diam>>>(
         vertices_dev, num_vertices_actual, diameters_sq_dev);
 
-    // Check for kernel launch errors
     cudaStatus = cudaGetLastError();
     if (cudaStatus != cudaSuccess)
       goto cleanup;
-    // Optional: Synchronize
-    // cudaStatus = cudaDeviceSynchronize(); if(cudaStatus != cudaSuccess) goto
-    // cleanup;
 
-    // Copy squared diameter results back to host
     cudaStatus = cudaMemcpy(diameters_sq_host, diameters_sq_dev,
                             4 * sizeof(double), cudaMemcpyDeviceToHost);
     if (cudaStatus != cudaSuccess)
       goto cleanup;
 
-    // Calculate final diameters (sqrt)
     results->diameters[0] = sqrt(diameters_sq_host[0]);
     results->diameters[1] = sqrt(diameters_sq_host[1]);
     results->diameters[2] = sqrt(diameters_sq_host[2]);
     results->diameters[3] = sqrt(diameters_sq_host[3]);
   } else {
-    // No vertices found, diameters are zero
     results->diameters[0] = 0.0;
     results->diameters[1] = 0.0;
     results->diameters[2] = 0.0;
@@ -793,7 +786,7 @@ extern "C" int launch_calculate_coefficients_cuda(
 
   // --- 7. Cleanup: Free GPU memory ---
 cleanup:
-  cudaFree(mask_dev); // cudaFree handles NULL pointers safely
+  cudaFree(mask_dev);
   cudaFree(size_dev);
   cudaFree(strides_dev);
   cudaFree(spacing_dev);
@@ -803,20 +796,18 @@ cleanup:
   cudaFree(vertex_count_dev);
   cudaFree(diameters_sq_dev);
 
-  // Return the status code (0 for success, non-zero for CUDA error)
-  // The CHECK_CUDA_ERROR macro handles returning the error code on failure.
-  // If we reach here without errors, cudaStatus should be cudaSuccess (0).
   if (cudaStatus != cudaSuccess) {
     fprintf(stderr, "CUDA Error occurred: %s\n",
             cudaGetErrorString(cudaStatus));
   }
-  return cudaStatus; // Return the final status
+  return cudaStatus;
 }
 
 // Wrapper for 2D CUDA Calculation
-extern "C" int launch_calculate_coefficients2D_cuda(
-    const char *mask_host, const int *size, const int *strides_host,
-    const double *spacing_host, ShapeCoefficients2D *results) {
+extern "C" int calculate_coefficients2D(const char *mask_host, const int *size,
+                                        const int *strides_host,
+                                        const double *spacing_host,
+                                        ShapeCoefficients2D *results) {
   cudaError_t cudaStatus = cudaSuccess;
 
   // --- Device Memory Pointers ---
@@ -836,16 +827,21 @@ extern "C" int launch_calculate_coefficients2D_cuda(
   unsigned long long vertex_count_host = 0;
   double diameter_sq_host = 0.0;
 
+  // --- Recalculate Host Strides (Assuming C-contiguous char mask) ---
+  int calculated_strides_host_2d[2];
+  calculated_strides_host_2d[1] = sizeof(char); // Stride for last dim (ix)
+  calculated_strides_host_2d[0] =
+      size[1] * calculated_strides_host_2d[1]; // Stride for first dim (iy)
+  // --- End Recalculation ---
+
   // --- Determine Allocation Sizes ---
   size_t mask_elements = (size_t)size[0] * size[1];
   size_t mask_size_bytes = mask_elements * sizeof(char);
-  // Estimate max vertices: 2 per square * number of squares
   size_t num_squares = (size_t)(size[0] - 1) * (size[1] - 1);
   size_t max_possible_vertices = num_squares * 2;
   if (max_possible_vertices == 0)
     max_possible_vertices = 1;
-  size_t vertices_bytes =
-      max_possible_vertices * 2 * sizeof(double); // 2 coordinates
+  size_t vertices_bytes = max_possible_vertices * 2 * sizeof(double);
 
   // --- 1. Allocate GPU Memory ---
   cudaStatus = cudaMalloc((void **)&mask_dev, mask_size_bytes);
@@ -900,8 +896,8 @@ extern "C" int launch_calculate_coefficients2D_cuda(
       cudaMemcpy(size_dev, size, 2 * sizeof(int), cudaMemcpyHostToDevice);
   if (cudaStatus != cudaSuccess)
     goto cleanup2d;
-  cudaStatus = cudaMemcpy(strides_dev, strides_host, 2 * sizeof(int),
-                          cudaMemcpyHostToDevice);
+  cudaStatus = cudaMemcpy(strides_dev, calculated_strides_host_2d,
+                          2 * sizeof(int), cudaMemcpyHostToDevice);
   if (cudaStatus != cudaSuccess)
     goto cleanup2d;
   cudaStatus = cudaMemcpy(spacing_dev, spacing_host, 2 * sizeof(double),
@@ -911,11 +907,9 @@ extern "C" int launch_calculate_coefficients2D_cuda(
 
   // --- 4. Launch Marching Squares Kernel ---
   if (num_squares > 0) {
-    dim3 blockSize(16, 16); // 256 threads per block (adjust as needed)
-    dim3 gridSize(
-        (size[1] - 1 + blockSize.x - 1) / blockSize.x, // Grid size based on Nx
-        (size[0] - 1 + blockSize.y - 1) / blockSize.y  // Grid size based on Ny
-    );
+    dim3 blockSize(16, 16);
+    dim3 gridSize((size[1] - 1 + blockSize.x - 1) / blockSize.x,
+                  (size[0] - 1 + blockSize.y - 1) / blockSize.y);
 
     calculate_coefficients2D_kernel<<<gridSize, blockSize>>>(
         mask_dev, size_dev, strides_dev, spacing_dev, perimeter_dev,
@@ -924,8 +918,6 @@ extern "C" int launch_calculate_coefficients2D_cuda(
     cudaStatus = cudaGetLastError();
     if (cudaStatus != cudaSuccess)
       goto cleanup2d;
-    // cudaStatus = cudaDeviceSynchronize(); if(cudaStatus != cudaSuccess) goto
-    // cleanup2d;
   }
 
   // --- 5. Copy Results (Perimeter, Surface, vertex count) back to Host ---
@@ -943,9 +935,7 @@ extern "C" int launch_calculate_coefficients2D_cuda(
     goto cleanup2d;
 
   // Final adjustments and storing results
-  results->surface =
-      fabs(surface_host / 2.0); // Surface requires division by 2 (use fabs for
-                                // potential negative from winding order)
+  results->surface = fabs(surface_host / 2.0);
   results->perimeter = perimeter_host;
   results->vertex_count = (size_t)vertex_count_host;
 
@@ -956,7 +946,7 @@ extern "C" int launch_calculate_coefficients2D_cuda(
             "%llu, Allocated: %llu. Diameter results might be based on "
             "incomplete data.\n",
             vertex_count_host, (unsigned long long)max_possible_vertices);
-    vertex_count_host = max_possible_vertices; // Clamp for diameter kernel
+    vertex_count_host = max_possible_vertices;
   }
 
   // --- 6. Launch Diameter Kernel (only if vertices were generated) ---
@@ -972,19 +962,15 @@ extern "C" int launch_calculate_coefficients2D_cuda(
     cudaStatus = cudaGetLastError();
     if (cudaStatus != cudaSuccess)
       goto cleanup2d;
-    // cudaStatus = cudaDeviceSynchronize(); if(cudaStatus != cudaSuccess) goto
-    // cleanup2d;
 
-    // Copy squared diameter result back to host
     cudaStatus = cudaMemcpy(&diameter_sq_host, diameter_sq_dev, sizeof(double),
                             cudaMemcpyDeviceToHost);
     if (cudaStatus != cudaSuccess)
       goto cleanup2d;
 
-    // Calculate final diameter (sqrt)
     results->diameter = sqrt(diameter_sq_host);
   } else {
-    results->diameter = 0.0; // No vertices, diameter is zero
+    results->diameter = 0.0;
   }
 
   // --- 7. Cleanup: Free GPU memory ---
@@ -1003,5 +989,5 @@ cleanup2d:
     fprintf(stderr, "CUDA Error occurred (2D): %s\n",
             cudaGetErrorString(cudaStatus));
   }
-  return cudaStatus; // Return final status
+  return cudaStatus;
 }

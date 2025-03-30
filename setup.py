@@ -178,6 +178,49 @@ if build_cuda:
     cuda_src_dir = os.path.join('radiomics', 'src', 'cuda')
     cuda_inc_dirs = incDirs + [cuda_src_dir]
 
+    # --- Determine CUDA Library Directory ---
+    nvcc_path_for_libs = find_nvcc() # Reuse find_nvcc to get path
+    cuda_library_dirs = [] # Default to empty list
+    if nvcc_path_for_libs:
+        # Try to infer lib64/lib path relative to nvcc's directory
+        cuda_root = os.path.dirname(os.path.dirname(nvcc_path_for_libs)) # Go up two levels (bin -> root)
+        potential_lib_paths = [
+            os.path.join(cuda_root, 'lib64'),
+            os.path.join(cuda_root, 'lib')
+        ]
+        found_lib_dir = None
+        for lib_path in potential_lib_paths:
+            if os.path.isdir(lib_path):
+                found_lib_dir = lib_path
+                print(f"Found CUDA library directory based on nvcc path: {found_lib_dir}")
+                break
+
+        if found_lib_dir:
+            cuda_library_dirs.append(found_lib_dir)
+        else:
+            print(f"Warning: Could not automatically determine CUDA library directory relative to nvcc: {nvcc_path_for_libs}. Checking CUDA_HOME/PATH.", file=sys.stderr)
+            # Fallback to CUDA_HOME/PATH environment variables if relative path failed
+            cuda_home_env = os.environ.get('CUDA_HOME') or os.environ.get('CUDA_PATH')
+            if cuda_home_env:
+                 potential_lib_paths_env = [
+                     os.path.join(cuda_home_env, 'lib64'),
+                     os.path.join(cuda_home_env, 'lib')
+                 ]
+                 found_lib_dir_env = None
+                 for lib_path_env in potential_lib_paths_env:
+                     if os.path.isdir(lib_path_env):
+                         found_lib_dir_env = lib_path_env
+                         print(f"Using CUDA library directory from CUDA_HOME/PATH: {found_lib_dir_env}")
+                         break
+                 if found_lib_dir_env:
+                     cuda_library_dirs.append(found_lib_dir_env)
+                 else:
+                     print(f"Warning: CUDA_HOME/PATH set ({cuda_home_env}), but could not find lib64 or lib subdir.", file=sys.stderr)
+
+    if not cuda_library_dirs:
+        print("Warning: CUDA library directory not found. Linking might fail if it's not in the system's default search paths.", file=sys.stderr)
+
+
     # --- Read NVCC_FLAGS from environment ---
     nvcc_flags_env = os.environ.get('NVCC_FLAGS', '')
     nvcc_extra_args = nvcc_flags_env.split() # Split flags by space
@@ -196,9 +239,8 @@ if build_cuda:
         ],
         include_dirs=cuda_inc_dirs,
         libraries=['cudart'], # Link CUDA runtime library
+        library_dirs=cuda_library_dirs,
         language='c++', # Ensure C++ linker is used
-        # extra_objects will be populated by CudaBuildExt
-        # Pass NVCC flags in the expected dictionary format for CudaBuildExt
         extra_compile_args={'nvcc': nvcc_extra_args}
     )
     cuda_extensions.append(cuda_shape_ext)

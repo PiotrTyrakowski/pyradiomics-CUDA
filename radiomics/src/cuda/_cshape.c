@@ -1,6 +1,6 @@
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
-#include "cshape.h"
+// #include "cshape.h" // REMOVE: This header is for the CPU version
 #include "cshape_cuda.h"
 #include <Python.h>
 #include <numpy/arrayobject.h>
@@ -37,24 +37,42 @@ static char coefficients2D_docstring[] =
     "pixel "
     "that is part of the segmentation and a pixel that is not.";
 
-static PyObject *cshape_calculate_coefficients(PyObject *self, PyObject *args);
+// REMOVE: Delete the entire 'cshape_calculate_coefficients' function below
+/*
+static PyObject *cshape_calculate_coefficients(PyObject *self, PyObject *args) {
+  // ... function body ...
+}
+*/
+
+// REMOVE: Delete the entire 'cshape_calculate_coefficients2D' function below
+/*
 static PyObject *cshape_calculate_coefficients2D(PyObject *self,
-                                                 PyObject *args);
+                                                 PyObject *args) {
+  // ... function body ...
+}
+*/
 
-int check_arrays(PyArrayObject *mask_arr, PyArrayObject *spacing_arr, int *size,
-                 int *strides, int dimension);
-
+// Keep these CUDA functions
 static PyObject *cshape_calculate_coefficients_cuda(PyObject *self,
                                                     PyObject *args);
 static PyObject *cshape_calculate_coefficients2D_cuda(PyObject *self,
                                                       PyObject *args);
 
+int check_arrays(PyArrayObject *mask_arr, PyArrayObject *spacing_arr, int *size,
+                 int *strides, int dimension);
+
+// Keep the CUDA error helper if needed by cshape_cuda.h or called functions
+// extern const char *cuda_get_last_error_string(void); // Ensure this is
+// declared, likely in cshape_cuda.h
+
 static PyMethodDef module_methods[] = {
-    //{"calculate_", cmatrices_, METH_VARARGS, _docstring},
-    {"calculate_coefficients", cshape_calculate_coefficients, METH_VARARGS,
-     coefficients_docstring},
-    {"calculate_coefficients2D", cshape_calculate_coefficients2D, METH_VARARGS,
-     coefficients2D_docstring},
+    // REMOVE: These entries correspond to the deleted CPU wrapper functions
+    // {"calculate_coefficients", cshape_calculate_coefficients, METH_VARARGS,
+    //  coefficients_docstring},
+    // {"calculate_coefficients2D", cshape_calculate_coefficients2D,
+    // METH_VARARGS,
+    //  coefficients2D_docstring},
+    // Keep the CUDA entries
     {"calculate_coefficients_cuda", cshape_calculate_coefficients_cuda,
      METH_VARARGS,
      "Arguments: Mask, PixelSpacing. Uses a CUDA-accelerated marching cubes "
@@ -118,99 +136,7 @@ PyMODINIT_FUNC PyInit__cshape(void) {
 }
 #endif
 
-static PyObject *cshape_calculate_coefficients(PyObject *self, PyObject *args) {
-  PyObject *mask_obj, *spacing_obj;
-  PyArrayObject *mask_arr, *spacing_arr;
-  int size[3];
-  int strides[3];
-  char *mask;
-  double *spacing;
-  double SA, Volume;
-  double diameters[4];
-  PyObject *diameter_obj;
-
-  // Parse the input tuple
-  if (!PyArg_ParseTuple(args, "OO", &mask_obj, &spacing_obj))
-    return NULL;
-
-  // Interpret the input as numpy arrays
-  mask_arr = (PyArrayObject *)PyArray_FROM_OTF(
-      mask_obj, NPY_BYTE, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
-  spacing_arr = (PyArrayObject *)PyArray_FROM_OTF(
-      spacing_obj, NPY_DOUBLE, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
-
-  if (check_arrays(mask_arr, spacing_arr, size, strides, 3) > 0)
-    return NULL;
-
-  // Get arrays in Ctype
-  mask = (char *)PyArray_DATA(mask_arr);
-  spacing = (double *)PyArray_DATA(spacing_arr);
-
-  // Calculate Surface Area and volume
-  if (calculate_coefficients(mask, size, strides, spacing, &SA, &Volume,
-                             diameters)) {
-    // An error has occurred
-    Py_XDECREF(mask_arr);
-    Py_XDECREF(spacing_arr);
-    PyErr_SetString(PyExc_RuntimeError,
-                    "Calculation of Shape coefficients failed.");
-    return NULL;
-  }
-
-  // Clean up
-  Py_XDECREF(mask_arr);
-  Py_XDECREF(spacing_arr);
-
-  diameter_obj = Py_BuildValue("ffff", diameters[0], diameters[1], diameters[2],
-                               diameters[3]);
-  return Py_BuildValue("ffN", SA, Volume, diameter_obj);
-}
-
-static PyObject *cshape_calculate_coefficients2D(PyObject *self,
-                                                 PyObject *args) {
-  PyObject *mask_obj, *spacing_obj;
-  PyArrayObject *mask_arr, *spacing_arr;
-  int size[2];
-  int strides[2];
-  char *mask;
-  double *spacing;
-  double perimeter, surface, diameter;
-
-  // Parse the input tuple
-  if (!PyArg_ParseTuple(args, "OO", &mask_obj, &spacing_obj))
-    return NULL;
-
-  // Interpret the input as numpy arrays
-  mask_arr = (PyArrayObject *)PyArray_FROM_OTF(
-      mask_obj, NPY_BYTE, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
-  spacing_arr = (PyArrayObject *)PyArray_FROM_OTF(
-      spacing_obj, NPY_DOUBLE, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
-
-  if (check_arrays(mask_arr, spacing_arr, size, strides, 2) > 0)
-    return NULL;
-
-  // Get arrays in Ctype
-  mask = (char *)PyArray_DATA(mask_arr);
-  spacing = (double *)PyArray_DATA(spacing_arr);
-
-  // Calculate Surface Area and volume
-  if (calculate_coefficients2D(mask, size, strides, spacing, &perimeter,
-                               &surface, &diameter)) {
-    // An error has occurred
-    Py_XDECREF(mask_arr);
-    Py_XDECREF(spacing_arr);
-    PyErr_SetString(PyExc_RuntimeError,
-                    "Calculation of Shape coefficients failed.");
-    return NULL;
-  }
-
-  // Clean up
-  Py_XDECREF(mask_arr);
-  Py_XDECREF(spacing_arr);
-
-  return Py_BuildValue("fff", perimeter, surface, diameter);
-}
-
+// Keep the cshape_calculate_coefficients_cuda function implementation
 static PyObject *cshape_calculate_coefficients_cuda(PyObject *self,
                                                     PyObject *args) {
   PyObject *mask_obj, *spacing_obj;
@@ -252,8 +178,8 @@ static PyObject *cshape_calculate_coefficients_cuda(PyObject *self,
   spacing_host = (double *)PyArray_DATA(spacing_arr);
 
   // 5. Call the CUDA wrapper function (Release GIL during compute)
-  Py_BEGIN_ALLOW_THREADS cuda_status = launch_calculate_coefficients_cuda(
-      mask_host, size, strides, spacing_host, &results);
+  Py_BEGIN_ALLOW_THREADS cuda_status =
+      calculate_coefficients(mask_host, size, strides, spacing_host, &results);
   Py_END_ALLOW_THREADS
 
       // Check status code from CUDA wrapper
@@ -293,6 +219,7 @@ cuda_error:                // Error handling path
   return NULL; // Indicate error to Python interpreter
 }
 
+// Keep the cshape_calculate_coefficients2D_cuda function implementation
 static PyObject *cshape_calculate_coefficients2D_cuda(PyObject *self,
                                                       PyObject *args) {
   PyObject *mask_obj, *spacing_obj;
@@ -331,7 +258,7 @@ static PyObject *cshape_calculate_coefficients2D_cuda(PyObject *self,
   spacing_host = (double *)PyArray_DATA(spacing_arr);
 
   // 5. Call the CUDA wrapper function (Release GIL)
-  Py_BEGIN_ALLOW_THREADS cuda_status = launch_calculate_coefficients2D_cuda(
+  Py_BEGIN_ALLOW_THREADS cuda_status = calculate_coefficients2D(
       mask_host, size, strides, spacing_host, &results);
   Py_END_ALLOW_THREADS
 
@@ -359,18 +286,18 @@ cuda2d_error:
   return NULL;
 }
 
+// Keep the check_arrays function implementation
 int check_arrays(PyArrayObject *mask_arr, PyArrayObject *spacing_arr, int *size,
                  int *strides, int dimension) {
   int i;
   npy_intp *np_strides; // NumPy strides are npy_intp
 
-  // Check if input objects were successfully converted (should be checked by
-  // caller too)
+  // Check if input objects were successfully converted
   if (mask_arr == NULL || spacing_arr == NULL) {
-    if (!PyErr_Occurred()) { // Set a generic error if none is set yet
+    if (!PyErr_Occurred()) {
       PyErr_SetString(PyExc_TypeError, "Input is not a valid NumPy array.");
     }
-    return 1; // Indicate error
+    return 1;
   }
 
   // Check dimensions
@@ -394,63 +321,52 @@ int check_arrays(PyArrayObject *mask_arr, PyArrayObject *spacing_arr, int *size,
     return 4;
   }
 
-  // Check contiguity (guaranteed if NPY_ARRAY_CARRAY* flags were used, but good
-  // practice) This check is more critical for the *original C* functions if
-  // they rely on it.
-  if (!PyArray_IS_C_CONTIGUOUS(mask_arr)) {
-    // This shouldn't happen if CARRAY flags were used in FROM_OTF, indicates
-    // potential issue.
-    PyErr_SetString(PyExc_ValueError, "Mask array must be C-contiguous.");
-    return 3;
-  }
-  // Spacing contiguity is less critical but checked by CARRAY flag anyway.
+  // NOTE: Explicit contiguity and stride checks REMOVED.
+  // We rely on PyArray_FROM_OTF with NPY_ARRAY_CARRAY_RO flag
+  // to either provide a C-contiguous array or raise an error itself.
 
-  // Get sizes and *element* strides
+  // Get sizes and calculate *element* strides (still needed for the kernel)
   np_strides = PyArray_STRIDES(mask_arr); // Get byte strides
   npy_intp itemsize = PyArray_ITEMSIZE(mask_arr);
-  if (itemsize <= 0) { // Sanity check itemsize
+  if (itemsize <= 0) {
     PyErr_SetString(PyExc_ValueError, "Invalid mask array itemsize.");
     return 5;
+  }
+  if (PyArray_SIZE(mask_arr) > 0) { // Check itemsize only if array is not empty
+    if (itemsize <= 0) {
+      PyErr_SetString(PyExc_ValueError, "Invalid mask array itemsize.");
+      return 5;
+    }
+  } else if (dimension > 0) {
+    // If array is empty, strides might be meaningless or 0. Set strides to 0.
+    for (i = 0; i < dimension; i++) {
+      size[i] = (int)PyArray_DIM(mask_arr, i);
+      strides[i] = 0;    // Assign 0 stride for empty array
+      if (size[i] < 0) { // Check for negative dimensions
+        PyErr_Format(PyExc_ValueError, "Dimension %d size is negative (%d).", i,
+                     size[i]);
+        return 9;
+      }
+    }
+    return 0; // Success for empty array
   }
 
   for (i = 0; i < dimension; i++) {
     size[i] = (int)PyArray_DIM(mask_arr, i); // Store dimension size
     // Calculate element stride (byte stride / size of one element)
-    strides[i] = (int)(np_strides[i] / itemsize);
-
-    // Sanity check calculated stride (especially for C-contiguity)
     if (np_strides[i] % itemsize != 0) {
-      PyErr_Format(
-          PyExc_ValueError,
-          "Byte stride for dimension %d is not a multiple of itemsize.", i);
+      // This check should still be valid. Non-integer element stride is bad.
+      PyErr_Format(PyExc_ValueError,
+                   "Byte stride for dimension %d (%ld) is not a multiple of "
+                   "itemsize (%ld).",
+                   i, (long)np_strides[i], (long)itemsize);
       return 6;
     }
-    if (i == dimension - 1) { // Innermost dimension stride check
-      if (size[i] > 1 &&
-          strides[i] != 1) { // Stride must be 1 if size > 1 for C-contiguity
-        PyErr_Format(
-            PyExc_ValueError,
-            "Innermost stride is %d, expected 1 for C-contiguous array.",
-            strides[i]);
-        return 7;
-      }
-    } else {
-      // Check expected stride for outer dimensions (optional but good sanity
-      // check)
-      npy_intp expected_stride = 1;
-      for (int j = i + 1; j < dimension; ++j)
-        expected_stride *= size[j];
-      if (size[i] > 1 && strides[i] != expected_stride) {
-        PyErr_Format(PyExc_ValueError,
-                     "Stride for dimension %d is %d, expected %ld for "
-                     "C-contiguous array.",
-                     i, strides[i], (long)expected_stride);
-        return 8;
-      }
-    }
-    if (size[i] <= 0 &&
-        PyArray_SIZE(mask_arr) >
-            0) { // Check for non-positive dimensions if array not empty
+    strides[i] = (int)(np_strides[i] / itemsize);
+
+    // Check for non-positive dimensions if array not empty
+    // Moved check here as size[i] is now available
+    if (size[i] <= 0 && PyArray_SIZE(mask_arr) > 0) {
       PyErr_Format(PyExc_ValueError, "Dimension %d size is non-positive (%d).",
                    i, size[i]);
       return 9;

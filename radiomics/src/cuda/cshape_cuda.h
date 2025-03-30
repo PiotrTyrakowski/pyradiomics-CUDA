@@ -37,7 +37,7 @@ typedef struct {
 
 // Wrapper function to launch 3D CUDA calculation
 // Returns 0 on success, non-zero CUDA error code on failure.
-int launch_calculate_coefficients_cuda(
+int calculate_coefficients(
     const char *mask_host, // Pointer to mask data on CPU
     const int *size,       // Dimensions {Nz, Ny, Nx} on CPU
     const int
@@ -48,7 +48,7 @@ int launch_calculate_coefficients_cuda(
 
 // Wrapper function to launch 2D CUDA calculation
 // Returns 0 on success, non-zero CUDA error code on failure.
-int launch_calculate_coefficients2D_cuda(
+int calculate_coefficients2D(
     const char *mask_host,       // Pointer to mask data on CPU
     const int *size,             // Dimensions {Ny, Nx} on CPU
     const int *strides_host,     // Element strides {stride_y, stride_x} on CPU
