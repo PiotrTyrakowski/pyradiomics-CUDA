@@ -488,23 +488,37 @@ __global__ void calculate_coefficients2D_kernel(
     return;
   }
 
+  // Keep the original index for line processing
+  unsigned char original_square_idx = square_idx;
+
   // --- Store Vertices for Diameter Calculation ---
-  // Store vertices on edges 3 and 2 if the corresponding points 0 and 2 are set
+  // Check vertices *before* processing lines, mirroring C code structure
+  // slightly Flip the index *only for the vertex check*, matching the C code
+  // logic.
+  unsigned char vertex_check_idx = original_square_idx;
+  if (vertex_check_idx > 7) {
+    vertex_check_idx ^= 0xF; // Flip bits if > 7
+  }
+
   int num_new_vertices = 0;
   double new_vertices_local[2 * 2]; // Max 2 vertices * 2 coordinates
 
-  // Check point 0 (edge 3)
-  if (square_idx & (1 << 0)) {
-    int edge_idx = 3; // Edge 3 in vertList2D
+  // Check point 0 (bit 0) using potentially flipped vertex_check_idx
+  // Corresponds to points_edges[0][0] in C code
+  if (vertex_check_idx & (1 << 0)) {
+    int edge_idx =
+        3; // Edge 3 corresponds to point 0 check (points_edges[1][0])
     new_vertices_local[num_new_vertices * 2 + 0] =
         (((double)iy) + d_vertList2D[edge_idx][0]) * spacing[0]; // Y coord
     new_vertices_local[num_new_vertices * 2 + 1] =
         (((double)ix) + d_vertList2D[edge_idx][1]) * spacing[1]; // X coord
     num_new_vertices++;
   }
-  // Check point 2 (edge 2)
-  if (square_idx & (1 << 2)) {
-    int edge_idx = 2; // Edge 2 in vertList2D
+  // Check point 2 (bit 2) using potentially flipped vertex_check_idx
+  // Corresponds to points_edges[0][1] in C code
+  if (vertex_check_idx & (1 << 2)) {
+    int edge_idx =
+        2; // Edge 2 corresponds to point 2 check (points_edges[1][1])
     new_vertices_local[num_new_vertices * 2 + 0] =
         (((double)iy) + d_vertList2D[edge_idx][0]) * spacing[0]; // Y coord
     new_vertices_local[num_new_vertices * 2 + 1] =
@@ -526,17 +540,19 @@ __global__ void calculate_coefficients2D_kernel(
   }
 
   // --- Process Lines for Perimeter and Surface ---
+  // Use the *original* square_idx for the line table lookup
   double local_Perim = 0;
   double local_Surf = 0;
 
   int t = 0;
   // Iterate through line segments defined in d_lineTable2D
-  while (d_lineTable2D[square_idx][t * 2] >= 0) {
+  while (d_lineTable2D[original_square_idx][t * 2] >=
+         0) {            // Use original_square_idx here
     double p1[2], p2[2]; // Line segment endpoints (y, x)
 
     // Get vertex indices from the table
-    int v_idx_1 = d_lineTable2D[square_idx][t * 2];
-    int v_idx_2 = d_lineTable2D[square_idx][t * 2 + 1];
+    int v_idx_1 = d_lineTable2D[original_square_idx][t * 2];
+    int v_idx_2 = d_lineTable2D[original_square_idx][t * 2 + 1];
 
     // Calculate absolute coordinates (Y, X)
     p1[0] = (((double)iy) + d_vertList2D[v_idx_1][0]) * spacing[0]; // Y

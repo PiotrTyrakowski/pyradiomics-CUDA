@@ -88,8 +88,20 @@ class RadiomicsShape2D(base.RadiomicsFeaturesBase):
 
     # Volume, Surface Area and eigenvalues are pre-calculated
 
-    # Compute Surface Area and volume
-    self.Perimeter, self.Surface, self.Diameter = cShape.calculate_coefficients2D(self.maskArray, self.pixelSpacing)
+    # Ensure correct types and C-contiguity for C extension
+    maskArray_int8 = self.maskArray.astype(numpy.int8)
+    maskArray_copy = maskArray_int8.copy(order='C')
+
+    pixelSpacing_float64 = self.pixelSpacing.astype(numpy.float64)
+    pixelSpacing_copy = pixelSpacing_float64.copy(order='C')
+
+    # Compute Surface Area and perimeter using the C-ordered copies
+    try:
+        self.Perimeter, self.Surface, self.Diameter = cShape.calculate_coefficients2D(maskArray_copy, pixelSpacing_copy)
+    except (ValueError, TypeError) as e:
+        self.logger.error(f"Error calling cShape.calculate_coefficients2D: {e}")
+        # Re-raising the error
+        raise e
 
     # Compute eigenvalues and -vectors
     Np = len(self.labelledPixelCoordinates[0])

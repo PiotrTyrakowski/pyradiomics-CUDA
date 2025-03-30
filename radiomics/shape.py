@@ -85,16 +85,6 @@ class RadiomicsShape(base.RadiomicsFeaturesBase):
     pixelSpacing_float64 = self.pixelSpacing.astype(np.float64)
     pixelSpacing_copy = pixelSpacing_float64.copy(order='C')
 
-    # --- Debugging Prints (keep them) ---
-    self.logger.info(f"maskArray_copy flags: {maskArray_copy.flags}") # Check flags of the copy
-    self.logger.info(f"maskArray_copy shape: {maskArray_copy.shape}")
-    self.logger.info(f"maskArray_copy dtype: {maskArray_copy.dtype}") # Should be int8
-    self.logger.info(f"pixelSpacing_copy flags: {pixelSpacing_copy.flags}") # Check flags of the copy
-    self.logger.info(f"pixelSpacing_copy shape: {pixelSpacing_copy.shape}")
-    self.logger.info(f"pixelSpacing_copy dtype: {pixelSpacing_copy.dtype}") # Should be float64
-    self.logger.info(f"Using cShape module: {cShape}")
-    # --- End Debugging Prints ---
-
     # Pass the explicit C-ordered copies to the C/CUDA extension
     try:
         # Use the copied arrays

@@ -350,7 +350,7 @@ logger.debug("Attempting to load C extensions...")
 # First, try to load CUDA extensions if GPU seems available
 gpu_available = checkGpuAvailability()
 
-if gpu_available or True: # for DEBUGING TODO delete
+if gpu_available: # or True: # for DEBUGING TODO delete
     logger.debug("GPU potentially available. Trying to import CUDA C extensions...")
     try:
         from radiomics.cuda import _cshape as cShape_cuda
