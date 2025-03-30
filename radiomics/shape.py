@@ -1,5 +1,6 @@
 import numpy
 import SimpleITK as sitk
+import numpy as np
 
 from radiomics import base, cShape, deprecated
 
@@ -41,6 +42,10 @@ class RadiomicsShape(base.RadiomicsFeaturesBase):
     assert inputMask.GetDimension() == 3, 'Shape features are only available in 3D. If 2D, use shape2D instead'
     super(RadiomicsShape, self).__init__(inputImage, inputMask, **kwargs)
 
+    # Check if the cShape module was loaded successfully
+    if cShape is None:
+        raise RuntimeError('Shape features require the C Shape extension module, which could not be loaded.')
+
   def _initVoxelBasedCalculation(self):
     raise NotImplementedError('Shape features are not available in voxel-based mode')
 
@@ -70,10 +75,24 @@ class RadiomicsShape(base.RadiomicsFeaturesBase):
 
     self.logger.debug('Pre-calculate Volume, Surface Area and Eigenvalues')
 
-    # Volume, Surface Area and eigenvalues are pre-calculated
+    # Cast mask to int8
+    maskArray_int8 = self.maskArray.astype(np.int8)
+    # Explicitly create a C-ordered copy
+    maskArray_copy = maskArray_int8.copy(order='C')
 
-    # Compute Surface Area and volume
-    self.SurfaceArea, self.Volume, self.diameters = cShape.calculate_coefficients(self.maskArray, self.pixelSpacing)
+    # Ensure pixel spacing is float64 and also create a C-ordered copy
+    # (Just to be consistent, though less likely to be the issue)
+    pixelSpacing_float64 = self.pixelSpacing.astype(np.float64)
+    pixelSpacing_copy = pixelSpacing_float64.copy(order='C')
+
+    # Pass the explicit C-ordered copies to the C/CUDA extension
+    try:
+        # Use the copied arrays
+        self.SurfaceArea, self.Volume, self.diameters = cShape.calculate_coefficients(maskArray_copy, pixelSpacing_copy)
+    except (ValueError, TypeError) as e:
+        self.logger.error(f"Error calling cShape.calculate_coefficients: {e}")
+        # Re-raising the error
+        raise e
 
     # Compute eigenvalues and -vectors
     Np = len(self.labelledVoxelCoordinates[0])

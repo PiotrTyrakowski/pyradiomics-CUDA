@@ -1,0 +1,21 @@
+{
+    "imageType": {
+        "Original": {}
+    },
+    "featureClass": {
+        "shape": [
+            "MeshVolume",
+            "VoxelVolume",
+            "SurfaceArea",
+            "SurfaceVolumeRatio",
+            "Maximum3DDiameter",
+            "Maximum2DDiameterSlice",
+            "Maximum2DDiameterColumn",
+            "Maximum2DDiameterRow",
+            "MajorAxisLength"
+        ]
+    },
+    "setting": {
+        "additionalInfo": false
+    }
+}

@@ -1,0 +1,46 @@
+DEBUG:radiomics: Getting test case brain1
+DEBUG:radiomics: No data directory specified, using temporary directory "/tmp/pyradiomics/data"
+DEBUG:radiomics: Getting Image file
+DEBUG:radiomics: File brain1_image.nrrd already downloaded
+DEBUG:radiomics: Getting Mask file
+DEBUG:radiomics: File brain1_label.nrrd already downloaded
+INFO:radiomics.featureextractor: Loading parameter file ./examples/exampleSettings/example_allShape.yaml
+DEBUG:radiomics.featureextractor: Parameters parsed, input is valid.
+DEBUG:radiomics.featureextractor: Applying settings
+DEBUG:radiomics.featureextractor: Enabled image types: {'Original': {}}
+DEBUG:radiomics.featureextractor: Enabled features: {'shape': ['VoxelVolume', 'MeshVolume', 'SurfaceArea', 'SurfaceVolumeRatio', 'Compactness1', 'Compactness2', 'Sphericity', 'SphericalDisproportion', 'Maximum3DDiameter', 'Maximum2DDiameterSlice', 'Maximum2DDiameterColumn', 'Maximum2DDiameterRow', 'MajorAxisLength', 'MinorAxisLength', 'LeastAxisLength', 'Elongation', 'Flatness']}
+DEBUG:radiomics.featureextractor: Settings: {'label': 1, 'interpolator': 'sitkBSpline', 'resampledPixelSpacing': None}
+INFO:radiomics.featureextractor: No valid config parameter, using defaults: {'minimumROIDimensions': 2, 'minimumROISize': None, 'normalize': False, 'normalizeScale': 1, 'removeOutliers': None, 'resampledPixelSpacing': None, 'interpolator': 'sitkBSpline', 'preCrop': False, 'padDistance': 5, 'distances': [1], 'force2D': False, 'force2Ddimension': 0, 'resegmentRange': None, 'label': 1, 'additionalInfo': True}
+INFO:radiomics.featureextractor: Enabled image types: {'Original': {}}
+INFO:radiomics.featureextractor: Enabled features: {'firstorder': [], 'glcm': [], 'gldm': [], 'glrlm': [], 'glszm': [], 'ngtdm': [], 'shape': []}
+INFO:radiomics.featureextractor: Applying custom setting overrides: {'binWidth': 25, 'resampledPixelSpacing': None, 'interpolator': 'sitkBSpline', 'verbose': True}
+DEBUG:radiomics.featureextractor: Settings: {'minimumROIDimensions': 2, 'minimumROISize': None, 'normalize': False, 'normalizeScale': 1, 'removeOutliers': None, 'resampledPixelSpacing': None, 'interpolator': 'sitkBSpline', 'preCrop': False, 'padDistance': 5, 'distances': [1], 'force2D': False, 'force2Ddimension': 0, 'resegmentRange': None, 'label': 1, 'additionalInfo': True, 'binWidth': 25, 'verbose': True}
+DEBUG:radiomics.featureextractor: Disabling all feature classes
+DEBUG:radiomics.featureextractor: Enabling all features in class firstorder
+DEBUG:radiomics.featureextractor: Enabled features: {'firstorder': []}
+INFO:radiomics.featureextractor: Calculating features with label: 1
+DEBUG:radiomics.featureextractor: Enabled images types: {'Original': {}}
+DEBUG:radiomics.featureextractor: Enabled features: {'firstorder': []}
+DEBUG:radiomics.featureextractor: Current settings: {'minimumROIDimensions': 2, 'minimumROISize': None, 'normalize': False, 'normalizeScale': 1, 'removeOutliers': None, 'resampledPixelSpacing': None, 'interpolator': 'sitkBSpline', 'preCrop': False, 'padDistance': 5, 'distances': [1], 'force2D': False, 'force2Ddimension': 0, 'resegmentRange': None, 'label': 1, 'additionalInfo': True, 'binWidth': 25, 'verbose': True}
+INFO:radiomics.featureextractor: Loading image and mask
+DEBUG:radiomics.imageoperations: Force casting mask to UInt32 to ensure correct datatype.
+DEBUG:radiomics.imageoperations: Checking mask with label 1
+DEBUG:radiomics.imageoperations: Calculating bounding box
+DEBUG:radiomics.imageoperations: Checking minimum number of dimensions requirements (2)
+DEBUG:radiomics.featureextractor: Image and Mask loaded and valid, starting extraction
+DEBUG:radiomics.imageoperations: Cropping to size [47 70  7]
+DEBUG:radiomics.featureextractor: Creating image type iterator
+INFO:radiomics.featureextractor: Adding image type "Original" with custom settings: {}
+DEBUG:radiomics.featureextractor: Extracting features
+DEBUG:radiomics.imageoperations: Yielding original image
+INFO:radiomics.featureextractor: Calculating features for original image
+DEBUG:radiomics.imageoperations: Cropping to size [47 70  7]
+INFO:radiomics.featureextractor: Computing firstorder
+DEBUG:radiomics.firstorder: Initializing feature class
+DEBUG:radiomics.imageoperations: Discretizing gray levels inside ROI
+DEBUG:radiomics.imageoperations: Calculated 34 bins for bin width 25 with edges: [ 450  475  500  525  550  575  600  625  650  675  700  725  750  775
+  800  825  850  875  900  925  950  975 1000 1025 1050 1075 1100 1125
+ 1150 1175 1200 1225 1250 1275 1300])
+DEBUG:radiomics.firstorder: First order feature class initialized
+DEBUG:radiomics.firstorder: Calculating features
+DEBUG:radiomics.featureextractor: Features extracted
