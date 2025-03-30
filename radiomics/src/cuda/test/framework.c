@@ -133,7 +133,7 @@ void CleanupResults(test_result_t *result) {
 }
 
 void AddErrorLog(test_result_t *result, error_log_t log) {
-    
+
 }
 
 void AddDataMeasurement(test_result_t *result, time_measurement_t measurement) {
