@@ -63,9 +63,18 @@ void AddDataMeasurement(test_result_t *result, time_measurement_t measurement);
 
 void AddErrorLog(test_result_t *result, error_log_t log);
 
+#define PREPARE_ERROR_LOG(error_name, ...) \
+do { \
+error_log_t log; \
+log.name = error_name; \
+log.value = (char *) malloc(256); \
+snprintf(log.value, 256, __VA_ARGS__); \
+AddErrorLog(test_result, log); \
+} while (0)
+
 void CleanupResults(test_result_t *result);
 
-void DisplayResults(FILE* file, test_result_t *results, size_t results_size);
+void DisplayResults(FILE *file, test_result_t *results, size_t results_size);
 
 // ------------------------------
 // Core functions

@@ -1,0 +1,29 @@
+Test (null):
+========================================
+Time measurements:
+========================================
+Errors:
+Error 0: surface_area mismatch with value: Expected: 49354.190844680, Got: 49354.190844632
+Error 1: volume mismatch with value: Expected: 275206.401062335, Got: 275206.401062353
+Test (null):
+========================================
+Time measurements:
+========================================
+Errors:
+Error 0: surface_area mismatch with value: Expected: 49354.190844680, Got: 0.000000000
+Error 1: volume mismatch with value: Expected: 275206.401062335, Got: 0.000000000
+Error 2: diameters mismatch with value: [Idx: 0] Expected:  130.844563337, Got:  0.000000000
+Error 3: diameters mismatch with value: [Idx: 1] Expected:  240.693847415, Got:  0.000000000
+Error 4: diameters mismatch with value: [Idx: 2] Expected:  243.294081520, Got:  0.000000000
+Error 5: diameters mismatch with value: [Idx: 3] Expected:  245.711267633, Got:  0.000000000
+Test (null):
+========================================
+Time measurements:
+========================================
+Errors:
+Error 0: surface_area mismatch with value: Expected: 49354.190844680, Got: 0.000000000
+Error 1: volume mismatch with value: Expected: 275206.401062335, Got: 0.000000000
+Error 2: diameters mismatch with value: [Idx: 0] Expected:  130.844563337, Got:  0.000000000
+Error 3: diameters mismatch with value: [Idx: 1] Expected:  240.693847415, Got:  0.000000000
+Error 4: diameters mismatch with value: [Idx: 2] Expected:  243.294081520, Got:  0.000000000
+Error 5: diameters mismatch with value: [Idx: 3] Expected:  245.711267633, Got:  0.000000000

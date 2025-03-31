@@ -150,39 +150,32 @@ static void ValidateResult_(test_result_t *test_result, data_ptr_t data, result_
     assert(result != NULL);
 
     if (fabs(result->surface_area - data->result.surface_area) > TEST_ACCURACY) {
-        char buffer[256];
-        snprintf(buffer, sizeof(buffer),
-                 "Expected: %f, Got: %f",
-                 data->result.surface_area,
-                 result->surface_area
+        PREPARE_ERROR_LOG(
+            "surface_area mismatch",
+            "Expected: %0.9f, Got: %0.9f",
+            data->result.surface_area,
+            result->surface_area
         );
-
-        AddErrorLog(test_result, (error_log_t){"surface_area mismatch", buffer});
     }
 
     if (fabs(result->volume - data->result.volume) > TEST_ACCURACY) {
-        char buffer[256];
-        snprintf(buffer, sizeof(buffer),
-                 "Expected: %f, Got: %f",
-                 data->result.volume,
-                 result->volume
+        PREPARE_ERROR_LOG(
+            "volume mismatch",
+            "Expected: %0.9f, Got: %0.9f",
+            data->result.volume,
+            result->volume
         );
-
-        AddErrorLog(test_result, (error_log_t){"volume mismatch", buffer});
     }
 
     for (size_t idx = 0; idx < DIAMETERS_SIZE; ++idx) {
         if (fabs(result->diameters[idx] - data->result.diameters[idx]) > TEST_ACCURACY) {
-            char buffer[256];
-            snprintf(buffer, sizeof(buffer),
-                     "[Idx: %lu] Expected: %f, Got: %f",
-                     idx,
-                     data->result.diameters[idx],
-                     result->diameters[idx]
+            PREPARE_ERROR_LOG(
+                "diameters mismatch",
+                "[Idx: %lu] Expected:  %0.9f, Got:  %0.9f",
+                idx,
+                data->result.diameters[idx],
+                result->diameters[idx]
             );
-
-            AddErrorLog(test_result, (error_log_t){"diameters", "Values mismatch"});
-            break;
         }
     }
 }
@@ -244,6 +237,8 @@ static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
     StartMeasurement(&measurement, buffer);
 
     result_t result;
+    memset(&result, 0, sizeof(result_t));
+
     func(
         data->mask,
         data->size,
