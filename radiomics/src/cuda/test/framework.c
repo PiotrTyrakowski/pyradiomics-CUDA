@@ -30,9 +30,26 @@ app_state_t g_AppState = {
 // Static functions
 // ------------------------------
 
+#define TOO_LONG_FILE_LENGTH 1024
+
 static int ParseSingleDouble_(FILE *file, data_ptr_t data) {
     assert(file != NULL);
     assert(data != NULL);
+
+    /* Check length of the file */
+    fseek(file, 0, SEEK_END);
+    const long length = ftell(file);
+
+    if (length == -1 || length > TOO_LONG_FILE_LENGTH) {
+        return 1;
+    }
+
+    /* read whole file */
+    fseek(file, 0, SEEK_SET);
+    char buffer[TOO_LONG_FILE_LENGTH];
+    if (fread(buffer, 1, length, file) != length) {
+        return 1;
+    }
 }
 
 static int ParseDiameters_(FILE *file, data_ptr_t data) {
