@@ -1,0 +1,18 @@
+/home/Jlisowskyy/.local/share/JetBrains/Toolbox/apps/clion/bin/cmake/linux/x64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/home/Jlisowskyy/.local/share/JetBrains/Toolbox/apps/clion/bin/ninja/linux/x64/ninja -G Ninja -S /home/Jlisowskyy/Repos/pyradiomics-CUDA/radiomics/src/cuda -B /home/Jlisowskyy/Repos/pyradiomics-CUDA/radiomics/src/cuda/cmake-build-debug
+-- The CUDA compiler identification is NVIDIA 12.8.93
+-- The C compiler identification is GNU 14.2.1
+-- Detecting CUDA compiler ABI info
+-- Detecting CUDA compiler ABI info - done
+-- Check for working CUDA compiler: /opt/cuda/bin/nvcc - skipped
+-- Detecting CUDA compile features
+-- Detecting CUDA compile features - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /sbin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Found Python3: /usr/include/python3.13 (found version "3.13.2") found components: Development Development.Module Development.Embed
+-- Using GCC...
+-- Configuring done (1.8s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/Jlisowskyy/Repos/pyradiomics-CUDA/radiomics/src/cuda/cmake-build-debug

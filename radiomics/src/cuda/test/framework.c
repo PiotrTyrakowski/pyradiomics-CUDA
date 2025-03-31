@@ -1,5 +1,6 @@
 #include "framework.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <memory.h>
 
@@ -23,9 +24,29 @@ app_state_t g_AppState = {
 // Static functions
 // ------------------------------
 
-void RunTest_(const char* input) {
+static void RunTestOnDefaultFunc_(data_t data) {
+    if (IsVerbose()) {
+        printf("[ INFO ] Running test on default function...\n");
+    }
+
+
+}
+
+static void RunTestOnFunc_(data_t data, const size_t idx) {
+    if (IsVerbose()) {
+        printf("[ INFO ] Running test on function with idx: %lu\n", idx);
+    }
+
+    shape_func_t func = g_ShapeFunctions[idx];
+
+}
+
+static void RunTest_(const char* input) {
     printf("Processing test for file: %s\n", input);
 
+    data_t data = ParseData(input);
+
+    RunTestOnDefaultFunc_(data);
     for (size_t idx = 0; idx < MAX_SOL_FUNCTIONS; ++idx) {
         if (g_ShapeFunctions[idx] == NULL) {
             continue;
@@ -34,6 +55,8 @@ void RunTest_(const char* input) {
         if (IsVerbose()) {
             printf("[ INFO ] Found solution with idx: %lu\n", idx);
         }
+
+        RunTestOnFunc_(data, idx);
     }
 }
 
@@ -132,14 +155,23 @@ void CleanupResults(test_result_t *result) {
     }
 }
 
-void AddErrorLog(test_result_t *result, error_log_t log) {
+void AddErrorLog(test_result_t *result, const error_log_t log) {
+    assert(result != NULL);
+    assert(result->error_logs_counter < MAX_ERROR_LOGS);
 
+    result->error_logs[result->error_logs_counter++] = log;
 }
 
-void AddDataMeasurement(test_result_t *result, time_measurement_t measurement) {
+void AddDataMeasurement(test_result_t *result, const time_measurement_t measurement) {
+    assert(result != NULL);
+    assert(result->measurement_counter < MAX_MEASUREMENTS);
 
+    result->measurements[result->measurement_counter++] = measurement;
 }
 
 test_result_t *AllocResults() {
     return &g_AppState.results[g_AppState.results_counter++];
+}
+
+data_t ParseData(const char *filename) {
 }

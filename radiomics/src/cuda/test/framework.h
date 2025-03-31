@@ -11,20 +11,20 @@
 
 typedef struct time_measurement {
     uint64_t time_ns;
-    const char* name;
+    const char *name;
 } time_measurement_t;
 
-#define MAX_MEASUREMENTS 32
+#define MAX_MEASUREMENTS 256
 
 typedef struct error_log {
-    const char* name;
-    char* value;
+    const char *name;
+    char *value;
 } error_log_t;
 
 #define MAX_ERROR_LOGS 32
 
 typedef struct test_result {
-    char* function_name;
+    char *function_name;
 
     time_measurement_t measurements[MAX_MEASUREMENTS];
     size_t measurement_counter;
@@ -33,15 +33,15 @@ typedef struct test_result {
     size_t error_logs_counter;
 } test_result_t;
 
-#define MAX_RESULTS 33
+#define MAX_RESULTS 257
 
 typedef struct app_state {
     int verbose_flag;
 
-    const char** input_files;
+    const char **input_files;
     size_t size_files;
 
-    const char* output_file;
+    const char *output_file;
 
     test_result_t results[MAX_RESULTS];
     size_t results_counter;
@@ -51,19 +51,27 @@ typedef struct app_state {
 // Data functions
 // ------------------------------
 
-void AddDataMeasurement(test_result_t* result, time_measurement_t measurement);
-void AddErrorLog(test_result_t* result, error_log_t log);
-void CleanupResults(test_result_t* result);
+void StartMeasurement(time_measurement_t *measurement, const char *name);
 
-void DisplayResults(FILE file, test_result_t* results, size_t results_size);
+void EndMeasurement(time_measurement_t *measurement);
+
+void AddDataMeasurement(test_result_t *result, time_measurement_t measurement);
+
+void AddErrorLog(test_result_t *result, error_log_t log);
+
+void CleanupResults(test_result_t *result);
+
+void DisplayResults(FILE file, test_result_t *results, size_t results_size);
 
 // ------------------------------
 // Core functions
 // ------------------------------
 
-void ParseCLI(int argc, const char** argv);
+typedef void *data_t;
 
-void FailApplication(const char* msg);
+void ParseCLI(int argc, const char **argv);
+
+void FailApplication(const char *msg);
 
 int IsVerbose();
 
@@ -73,6 +81,8 @@ void RunTests();
 
 void FinalizeTesting();
 
-test_result_t* AllocResults();
+test_result_t *AllocResults();
+
+data_t ParseData(const char *filename);
 
 #endif // CANCERSOLVER_FRAMEWORK_H
