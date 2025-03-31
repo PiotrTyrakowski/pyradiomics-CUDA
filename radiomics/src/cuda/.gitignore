@@ -1,2 +1,4 @@
 data
 build
+out.txt
+cmake*
