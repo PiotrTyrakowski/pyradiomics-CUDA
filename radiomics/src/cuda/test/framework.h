@@ -13,7 +13,7 @@
 
 typedef struct time_measurement {
     uint64_t time_ns;
-    const char *name;
+    char *name;
 } time_measurement_t;
 
 #define MAX_MEASUREMENTS 32
@@ -55,11 +55,18 @@ typedef struct app_state {
 // Data functions
 // ------------------------------
 
-void StartMeasurement(time_measurement_t *measurement, const char *name);
+void StartMeasurement(time_measurement_t *measurement, char *name);
 
 void EndMeasurement(time_measurement_t *measurement);
 
 void AddDataMeasurement(test_result_t *result, time_measurement_t measurement);
+
+#define PREPARE_DATA_MEASUREMENT(data_measurement, ...) \
+    do { \
+        char* name = (char *) malloc(256); \
+        snprintf(name, 256, __VA_ARGS__); \
+        StartMeasurement(&data_measurement, name); \
+    } while (0)
 
 void AddErrorLog(test_result_t *result, error_log_t log);
 
@@ -92,7 +99,15 @@ void RunTests();
 
 void FinalizeTesting();
 
-test_result_t *AllocResults();
+test_result_t *AllocResults(char *name);
+
+#define PREPARE_TEST_RESULT(...) \
+    test_result_t *test_result; \
+    do { \
+        char *name = (char *) malloc(256); \
+        snprintf(name, 256, __VA_ARGS__); \
+        test_result = AllocResults(name); \
+    } while (0)
 
 data_ptr_t ParseData(const char *filename);
 

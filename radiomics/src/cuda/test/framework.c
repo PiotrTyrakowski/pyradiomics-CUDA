@@ -185,12 +185,17 @@ static result_t RunTestOnDefaultFunc_(data_ptr_t data) {
 
     TRACE_INFO("Running test on default function...");
 
-    test_result_t *test_result = AllocResults();
+    PREPARE_TEST_RESULT(
+        "Pyradiomics implementation"
+    );
 
     result_t result;
 
     time_measurement_t measurement;
-    StartMeasurement(&measurement, "Pyradiomics implementation");
+    PREPARE_DATA_MEASUREMENT(
+        measurement,
+        "Pyradiomics implementation"
+    );
 
     calculate_coefficients(
         data->mask,
@@ -204,6 +209,7 @@ static result_t RunTestOnDefaultFunc_(data_ptr_t data) {
     );
 
     EndMeasurement(&measurement);
+    AddDataMeasurement(test_result, measurement);
 
     if (!data->is_result_provided) {
         TRACE_INFO("No result provided, skipping comparison...");
@@ -225,20 +231,19 @@ static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
     TRACE_INFO("Running test on function with idx: %lu", idx);
 
     shape_func_t func = g_ShapeFunctions[idx];
-    test_result_t *test_result = AllocResults();
-
-    char buffer[256];
-    snprintf(buffer, sizeof(buffer),
-             "Custom implementation with idx: %lu",
-             idx
+    PREPARE_TEST_RESULT(
+        "Custom implementation with idx: %lu",
+        idx
     );
 
     time_measurement_t measurement;
-    StartMeasurement(&measurement, buffer);
+    PREPARE_DATA_MEASUREMENT(
+        measurement,
+        "Custom implementation with idx: %lu",
+        idx
+    );
 
-    result_t result;
-    memset(&result, 0, sizeof(result_t));
-
+    result_t result = {0};
     func(
         data->mask,
         data->size,
@@ -251,6 +256,8 @@ static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
     );
 
     EndMeasurement(&measurement);
+    AddDataMeasurement(test_result, measurement);
+
     assert(data->is_result_provided);
     ValidateResult_(test_result, data, &result);
 }
@@ -377,8 +384,12 @@ void DisplayResults(FILE *file, test_result_t *results, size_t results_size) {
         fprintf(file, "\nTime measurements:\n");
 
         for (size_t j = 0; j < results[idx].measurement_counter; ++j) {
-            fprintf(file, "Measurement %lu: %s with time: %lu ns\n", j, results[idx].measurements[j].name,
-                    results[idx].measurements[j].time_ns);
+            fprintf(file, "Measurement %lu: %s with time: %fms and %luns\n",
+                    j,
+                    results[idx].measurements[j].name,
+                    (double) results[idx].measurements[j].time_ns / 1e6,
+                    results[idx].measurements[j].time_ns
+            );
         }
 
         for (size_t i = 0; i < 8; ++i) { fputs("=====", file); }
@@ -388,6 +399,8 @@ void DisplayResults(FILE *file, test_result_t *results, size_t results_size) {
             fprintf(file, "Error %lu: %s with value: %s\n", j, results[idx].error_logs[j].name,
                     results[idx].error_logs[j].value);
         }
+
+        fprintf(file, "\n\n");
     }
 }
 
@@ -397,6 +410,15 @@ void CleanupResults(test_result_t *result) {
         free(result->error_logs[idx].value);
         result->error_logs[idx].value = NULL;
     }
+
+    /* CleanupResults measurements */
+    for (size_t idx = 0; idx < result->measurement_counter; ++idx) {
+        free(result->measurements[idx].name);
+        result->measurements[idx].name = NULL;
+    }
+
+    /* CleanupResults result */
+    free(result->function_name);
 }
 
 void AddErrorLog(test_result_t *result, const error_log_t log) {
@@ -408,7 +430,7 @@ void AddErrorLog(test_result_t *result, const error_log_t log) {
     TRACE_ERROR("Error type occurred: %s with value: %s", log.name, log.value);
 }
 
-void StartMeasurement(time_measurement_t *measurement, const char *name) {
+void StartMeasurement(time_measurement_t *measurement, char *name) {
     // TODO: windows
 
     measurement->name = name;
@@ -440,8 +462,11 @@ void AddDataMeasurement(test_result_t *result, const time_measurement_t measurem
     TRACE_INFO("New measurement done: %s with time: %lu", measurement.name, measurement.time_ns);
 }
 
-test_result_t *AllocResults() {
-    return &g_AppState.results[g_AppState.results_counter++];
+test_result_t *AllocResults(char *name) {
+    test_result_t *result = &g_AppState.results[g_AppState.results_counter++];
+    result->function_name = name;
+
+    return result;
 }
 
 data_ptr_t ParseData(const char *filename) {
