@@ -14,7 +14,7 @@ typedef struct time_measurement {
     const char *name;
 } time_measurement_t;
 
-#define MAX_MEASUREMENTS 256
+#define MAX_MEASUREMENTS 32
 
 typedef struct error_log {
     const char *name;
@@ -47,6 +47,30 @@ typedef struct app_state {
     size_t results_counter;
 } app_state_t;
 
+#define DIAMETERS_SIZE 4
+typedef struct result {
+    /* Results */
+
+    double surface_area;
+    double volume;
+    double diameters[DIAMETERS_SIZE];
+} result_t;
+
+typedef struct data {
+    /* Arguments */
+    char *mask;
+    int *size;
+    int *strides;
+    double *spacing;
+
+    unsigned char is_result_provided;
+    result_t result;
+} data_t;
+
+typedef data_t *data_ptr_t;
+
+#define FILE_PATH_SEPARATOR '/'
+
 // ------------------------------
 // Data functions
 // ------------------------------
@@ -67,8 +91,6 @@ void DisplayResults(FILE file, test_result_t *results, size_t results_size);
 // Core functions
 // ------------------------------
 
-typedef void *data_t;
-
 void ParseCLI(int argc, const char **argv);
 
 void FailApplication(const char *msg);
@@ -83,6 +105,8 @@ void FinalizeTesting();
 
 test_result_t *AllocResults();
 
-data_t ParseData(const char *filename);
+data_ptr_t ParseData(const char *filename);
+
+void CleanupData(data_ptr_t data);
 
 #endif // CANCERSOLVER_FRAMEWORK_H
