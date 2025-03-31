@@ -1,5 +1,0 @@
-/home/Jlisowskyy/Repos/pyradiomics-CUDA/radiomics/src/cuda/cmake-build-debug/CMakeFiles/CUDA_LIB.dir
-/home/Jlisowskyy/Repos/pyradiomics-CUDA/radiomics/src/cuda/cmake-build-debug/CMakeFiles/PYRADIOMICS.dir
-/home/Jlisowskyy/Repos/pyradiomics-CUDA/radiomics/src/cuda/cmake-build-debug/CMakeFiles/TEST_APP.dir
-/home/Jlisowskyy/Repos/pyradiomics-CUDA/radiomics/src/cuda/cmake-build-debug/CMakeFiles/edit_cache.dir
-/home/Jlisowskyy/Repos/pyradiomics-CUDA/radiomics/src/cuda/cmake-build-debug/CMakeFiles/rebuild_cache.dir

@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "loader.h"
+
 // ------------------------------
 // defines
 // ------------------------------
@@ -46,28 +48,6 @@ typedef struct app_state {
     test_result_t results[MAX_RESULTS];
     size_t results_counter;
 } app_state_t;
-
-#define DIAMETERS_SIZE 4
-typedef struct result {
-    /* Results */
-
-    double surface_area;
-    double volume;
-    double diameters[DIAMETERS_SIZE];
-} result_t;
-
-typedef struct data {
-    /* Arguments */
-    char *mask;
-    int *size;
-    int *strides;
-    double *spacing;
-
-    unsigned char is_result_provided;
-    result_t result;
-} data_t;
-
-typedef data_t *data_ptr_t;
 
 #define FILE_PATH_SEPARATOR '/'
 

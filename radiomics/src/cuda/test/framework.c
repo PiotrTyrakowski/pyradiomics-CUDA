@@ -293,7 +293,7 @@ void StartMeasurement(time_measurement_t *measurement, const char *name) {
     const int result = clock_gettime(CLOCK_MONOTONIC, &start);
     assert(result == 0);
 
-    measurement->time_ns = start.tv_sec * 1'000'000'000 + start.tv_nsec;
+    measurement->time_ns = start.tv_sec * 1000000000 + start.tv_nsec;
 }
 
 void EndMeasurement(time_measurement_t *measurement) {
@@ -303,7 +303,7 @@ void EndMeasurement(time_measurement_t *measurement) {
     const int result = clock_gettime(CLOCK_MONOTONIC, &end);
     assert(result == 0);
 
-    const uint64_t end_ns = end.tv_sec * 1'000'000'000 + end.tv_nsec;
+    const uint64_t end_ns = end.tv_sec * 1000000000 + end.tv_nsec;
     measurement->time_ns = end_ns - measurement->time_ns;
 }
 
@@ -321,6 +321,7 @@ test_result_t *AllocResults() {
 }
 
 data_ptr_t ParseData(const char *filename) {
+
 }
 
 void CleanupData(data_ptr_t data) {
