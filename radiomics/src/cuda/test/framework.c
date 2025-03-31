@@ -50,6 +50,8 @@ static int ParseSingleDouble_(FILE *file, data_ptr_t data) {
     if (fread(buffer, 1, length, file) != length) {
         return 1;
     }
+
+    
 }
 
 static int ParseDiameters_(FILE *file, data_ptr_t data) {
