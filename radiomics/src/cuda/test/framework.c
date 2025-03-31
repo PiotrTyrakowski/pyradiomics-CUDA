@@ -1,4 +1,5 @@
 #include "framework.h"
+#include "debug_macros.h"  // Include the new debug macros
 
 #include <assert.h>
 #include <stdio.h>
@@ -69,9 +70,7 @@ static void ValidateResult_(test_result_t *test_result, data_ptr_t data, result_
 }
 
 static result_t RunTestOnDefaultFunc_(data_ptr_t data) {
-    if (IsVerbose()) {
-        printf("[ INFO ] Running test on default function...\n");
-    }
+    TRACE_INFO("Running test on default function...");
 
     test_result_t *test_result = AllocResults();
 
@@ -94,9 +93,7 @@ static result_t RunTestOnDefaultFunc_(data_ptr_t data) {
     EndMeasurement(&measurement);
 
     if (!data->is_result_provided) {
-        if (IsVerbose()) {
-            printf("[ INFO ] No result provided, skipping comparison...\n");
-        }
+        TRACE_INFO("No result provided, skipping comparison...");
 
         /* Store results if not available in data */
         memcpy(&data->result, &result, sizeof(result_t));
@@ -110,9 +107,7 @@ static result_t RunTestOnDefaultFunc_(data_ptr_t data) {
 }
 
 static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
-    if (IsVerbose()) {
-        printf("[ INFO ] Running test on function with idx: %lu\n", idx);
-    }
+    TRACE_INFO("Running test on function with idx: %lu", idx);
 
     shape_func_t func = g_ShapeFunctions[idx];
     test_result_t *test_result = AllocResults();
@@ -154,10 +149,7 @@ static void RunTest_(const char *input) {
             continue;
         }
 
-        if (IsVerbose()) {
-            printf("[ INFO ] Found solution with idx: %lu\n", idx);
-        }
-
+        TRACE_INFO("Found solution with idx: %lu", idx);
         RunTestOnFunc_(data, idx);
     }
 
@@ -214,6 +206,17 @@ void DisplayHelp() {
 }
 
 void FinalizeTesting() {
+    /* Write Result to output file */
+    FILE *file = fopen(g_AppState.output_file, "w");
+    if (file == NULL) {
+        FailApplication("Failed to open output file...");
+    }
+
+    DisplayResults(file, g_AppState.results, g_AppState.results_counter);
+
+    /* Write results to stdout */
+    DisplayResults(stdout, g_AppState.results, g_AppState.results_counter);
+
     free(g_AppState.input_files);
 
     for (size_t idx = 0; idx < g_AppState.results_counter; ++idx) {
@@ -224,10 +227,8 @@ void FinalizeTesting() {
 void RunTests() {
     RegisterSolutions();
 
-    if (IsVerbose()) {
-        printf("Running tests in verbose mode...\n");
-        printf("Processing %zu input files...\n", g_AppState.size_files);
-    }
+    TRACE_INFO("Running tests in verbose mode...");
+    TRACE_INFO("Processing %zu input files...", g_AppState.size_files);
 
     for (size_t i = 0; i < g_AppState.size_files; ++i) {
         RunTest_(g_AppState.input_files[i]);
@@ -244,7 +245,26 @@ void FailApplication(const char *msg) {
     exit(EXIT_FAILURE);
 }
 
-void DisplayResults(FILE file, test_result_t *results, size_t results_size) {
+void DisplayResults(FILE *file, test_result_t *results, size_t results_size) {
+    for (size_t idx = 0; idx < results_size; ++idx) {
+        fprintf(file, "Test %s:\n", results[idx].function_name);
+
+        for (size_t i = 0; i < 8; ++i) { fputs("=====", file); }
+        fprintf(file, "\nTime measurements:\n");
+
+        for (size_t j = 0; j < results[idx].measurement_counter; ++j) {
+            fprintf(file, "Measurement %lu: %s with time: %lu ns\n", j, results[idx].measurements[j].name,
+                    results[idx].measurements[j].time_ns);
+        }
+
+        for (size_t i = 0; i < 8; ++i) { fputs("=====", file); }
+        fprintf(file, "\nErrors:\n");
+
+        for (size_t j = 0; j < results[idx].error_logs_counter; ++j) {
+            fprintf(file, "Error %lu: %s with value: %s\n", j, results[idx].error_logs[j].name,
+                    results[idx].error_logs[j].value);
+        }
+    }
 }
 
 void CleanupResults(test_result_t *result) {
@@ -261,9 +281,7 @@ void AddErrorLog(test_result_t *result, const error_log_t log) {
 
     result->error_logs[result->error_logs_counter++] = log;
 
-    if (IsVerbose()) {
-        printf("[ ERROR ] Error type occurred: %s with value: %s\n", log.name, log.value);
-    }
+    TRACE_ERROR("Error type occurred: %s with value: %s", log.name, log.value);
 }
 
 void StartMeasurement(time_measurement_t *measurement, const char *name) {
@@ -295,9 +313,7 @@ void AddDataMeasurement(test_result_t *result, const time_measurement_t measurem
 
     result->measurements[result->measurement_counter++] = measurement;
 
-    if (IsVerbose()) {
-        printf("[ INFO ] New measurement done: %s with time: %lu\n", measurement.name, measurement.time_ns);
-    }
+    TRACE_INFO("New measurement done: %s with time: %lu", measurement.name, measurement.time_ns);
 }
 
 test_result_t *AllocResults() {

@@ -85,7 +85,7 @@ void AddErrorLog(test_result_t *result, error_log_t log);
 
 void CleanupResults(test_result_t *result);
 
-void DisplayResults(FILE file, test_result_t *results, size_t results_size);
+void DisplayResults(FILE* file, test_result_t *results, size_t results_size);
 
 // ------------------------------
 // Core functions
