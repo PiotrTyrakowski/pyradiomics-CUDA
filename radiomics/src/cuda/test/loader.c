@@ -1,5 +1,6 @@
 #include "loader.h"
 
+#include <debug_macros.h>
 #include <framework.h>
 #include <Python.h>
 #include <numpy/arrayobject.h>
@@ -14,24 +15,24 @@
 static char *LoadNpyHeader_(FILE *fp) {
     char magic[6];
     if (fread(magic, sizeof(char), 6, fp) != 6) {
-        fprintf(stderr, "[ ERROR ] Failed to read magic number\n");
+        ERROR("Failed to read magic number\n");
         return NULL;
     }
 
     if (memcmp(magic, "\x93NUMPY", 6) != 0) {
-        fprintf(stderr, "[ ERROR ] Invalid magic number\n");
+        ERROR("Invalid magic number\n");
         return NULL;
     }
 
     unsigned char version[2];
     if (fread(version, sizeof(unsigned char), 2, fp) != 2) {
-        fprintf(stderr, "[ ERROR ] Failed to read version\n");
+        ERROR("Failed to read version\n");
         return NULL;
     }
 
     unsigned short header_len;
     if (fread(&header_len, sizeof(unsigned short), 1, fp) != 1) {
-        fprintf(stderr, "[ ERROR ] Failed to read header length\n");
+        ERROR("Failed to read header length\n");
         return NULL;
     }
 
@@ -41,7 +42,7 @@ static char *LoadNpyHeader_(FILE *fp) {
     }
 
     if (fread(header, sizeof(char), header_len, fp) != header_len) {
-        fprintf(stderr, "[ ERROR ] Failed to read header\n");
+        ERROR("Failed to read header\n");
         free(header);
         return NULL;
     }
@@ -51,26 +52,30 @@ static char *LoadNpyHeader_(FILE *fp) {
 }
 
 static int ParseDtype_(const char *header, int *dtype_size) {
-    char *dtype_str = strstr(header, "dtype");
+    char *dtype_str = strstr(header, "descr");  // Changed from "dtype" to "descr" to match the example format
     if (!dtype_str) {
-        fprintf(stderr, "[ ERROR ] Dtype information not found in header\n");
+        ERROR("Dtype information not found in header\n");
         return 1;
     }
 
-    if (strstr(dtype_str, "float64")) {
+    if (strstr(dtype_str, "<f8") || strstr(dtype_str, "float64")) {
         *dtype_size = 8; // For float64
-    } else if (strstr(dtype_str, "float32")) {
+    } else if (strstr(dtype_str, "<f4") || strstr(dtype_str, "float32")) {
         *dtype_size = 4; // For float32
-    } else if (strstr(dtype_str, "int64")) {
+    } else if (strstr(dtype_str, "<i8") || strstr(dtype_str, "int64")) {
         *dtype_size = 8; // For int64
-    } else if (strstr(dtype_str, "int32")) {
+    } else if (strstr(dtype_str, "<i4") || strstr(dtype_str, "int32")) {
         *dtype_size = 4; // For int32
-    } else if (strstr(dtype_str, "int16")) {
+    } else if (strstr(dtype_str, "<i2") || strstr(dtype_str, "int16")) {
         *dtype_size = 2; // For int16
-    } else if (strstr(dtype_str, "int8") || strstr(dtype_str, "bool") || strstr(dtype_str, "uint8")) {
-        *dtype_size = 1; // For int8, bool or uint8
+    } else if (strstr(dtype_str, "<i1") || strstr(dtype_str, "int8")) {
+        *dtype_size = 1; // For int8
+    } else if (strstr(dtype_str, "|b1") || strstr(dtype_str, "bool")) {
+        *dtype_size = 1; // For bool
+    } else if (strstr(dtype_str, "|u1") || strstr(dtype_str, "uint8")) {
+        *dtype_size = 1; // For uint8
     } else {
-        fprintf(stderr, "[ ERROR ] Unsupported data type\n");
+        ERROR("Unsupported data type: %s\n", dtype_str);
         return 1;
     }
 
@@ -80,27 +85,27 @@ static int ParseDtype_(const char *header, int *dtype_size) {
 static int ParseShape_(const char *header, int *ndim, npy_intp **dimensions) {
     char *shape_str = strstr(header, "shape");
     if (!shape_str) {
-        fprintf(stderr, "[ ERROR ] Shape information not found in header\n");
+        ERROR("Shape information not found in header\n");
         return 1;
     }
 
     char *shape_tuple = strchr(shape_str, '(');
     if (!shape_tuple) {
-        fprintf(stderr, "[ ERROR ] Shape tuple not found in header\n");
+        ERROR("Shape tuple not found in header\n");
         return 1;
     }
 
     *ndim = 0;
     char *cursor = shape_tuple;
-    while (*cursor) {
+    while (*cursor && *cursor != ')') {
         if (*cursor == ',') {
             (*ndim)++;
         }
         cursor++;
     }
-    if (*(cursor - 1) != ')') {
+    if (*cursor == ')' && *(cursor - 1) != ',') {
         (*ndim)++; // For the last dimension if there's no trailing comma
-    } else if (*(cursor - 2) == ',' && *(cursor - 1) == ')') {
+    } else if (*(cursor - 1) == ',' && *cursor == ')') {
         // Handle the case of a 1D array with trailing comma: (n,)
     } else {
         (*ndim)++; // For single-element tuple: (n)
@@ -177,7 +182,7 @@ static void *LoadNpyFile(FILE *fp, int *ndim, npy_intp **dimensions, int *dtype_
     }
 
     if (fread(data, *dtype_size, total_elements, fp) != total_elements) {
-        fprintf(stderr, "[ ERROR ] Failed to read data from file\n");
+        ERROR("Failed to read data from file\n");
         free(data);
         free(*dimensions);
         *dimensions = NULL;
@@ -220,17 +225,17 @@ static int LoadNumpyArrays_(FILE *mask_file, FILE *spacing_file, data_ptr_t data
     }
 
     if (mask_ndim != EXPECTED_DIMENSION) {
-        fprintf(stderr, "[ ERROR ] Mask array must be 3D, got %dD.\n", mask_ndim);
+        ERROR("Mask array must be 3D, got %dD.\n", mask_ndim);
         goto FAIL_CLEANUP;
     }
 
     if (spacing_ndim != 1) {
-        fprintf(stderr, "[ ERROR ] Spacing array must be 1D, got %dD.\n", spacing_ndim);
+        ERROR("Spacing array must be 1D, got %dD.\n", spacing_ndim);
         goto FAIL_CLEANUP;
     }
 
     if (spacing_dimensions[0] != EXPECTED_DIMENSION) {
-        fprintf(stderr, "[ ERROR ] Spacing array must have %d elements, got %ld.\n", EXPECTED_DIMENSION,
+        ERROR("Spacing array must have %d elements, got %ld.\n", EXPECTED_DIMENSION,
                 (long) spacing_dimensions[0]);
         goto FAIL_CLEANUP;
     }
@@ -246,7 +251,7 @@ static int LoadNumpyArrays_(FILE *mask_file, FILE *spacing_file, data_ptr_t data
 
         // Check for non-positive dimensions
         if (size[i] <= 0) {
-            fprintf(stderr, "[ ERROR ] Mask array dimension %d is non-positive: %ld\n", i, (long) mask_dimensions[i]);
+            ERROR("Mask array dimension %d is non-positive: %ld\n", i, (long) mask_dimensions[i]);
             goto FAIL_CLEANUP;
         }
     }
@@ -295,20 +300,21 @@ int LoadNumpyArrays(const char *filename, data_ptr_t data) {
     char spacing_name[256];
     snprintf(spacing_name, 256, "%s" FILE_PATH_SEPARATOR "pixel_spacing.npy", filename);
 
-    FILE *mask_fp = fopen(mask_name, "r");
-    FILE *spacing_fp = fopen(spacing_name, "r");
+    FILE *mask_fp = fopen(mask_name, "rb");
+    FILE *spacing_fp = fopen(spacing_name, "rb");
 
     int rc = 0;
     if (mask_fp == NULL || spacing_fp == NULL) {
         if (mask_fp == NULL) {
-            printf("[ ERROR ] Failed to open mask file: %s\n", mask_name);
+            printf("Failed to open mask file: %s\n", mask_name);
         }
 
         if (spacing_fp == NULL) {
-            printf("[ ERROR ] Failed to open spacing file: %s\n", spacing_name);
+            printf("Failed to open spacing file: %s\n", spacing_name);
         }
 
         rc = 1;
+        goto CLEANUP;
     }
 
     rc = LoadNumpyArrays_(mask_fp, spacing_fp, data);

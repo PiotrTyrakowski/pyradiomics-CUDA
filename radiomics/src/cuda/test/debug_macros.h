@@ -27,4 +27,7 @@ printf(format __VA_OPT__(,) __VA_ARGS__); \
 #define TRACE_INFO(message, ...)    TRACE(TRACE_FORMAT_INFO(message) __VA_OPT__(,) __VA_ARGS__)
 #define TRACE_SUCCESS(message, ...) TRACE(TRACE_FORMAT_SUCCESS(message) __VA_OPT__(,) __VA_ARGS__)
 
+#define ERROR(message, ...) \
+    fprintf(stderr, TRACE_FORMAT_ERROR(message) __VA_OPT__(,) __VA_ARGS__); \
+
 #endif // DEBUG_MACROS_H
