@@ -303,12 +303,12 @@ static void RunTest_(const char *input) {
 
 static void PrintSeparator_(FILE *file, size_t columns) {
     for (size_t idx = 0; idx < columns; ++idx) {
-        for (size_t i = 0; i < 10; ++i) {
+        for (size_t i = 0; i < 16; ++i) {
             fputs("-", file);
         }
         fputs("+", file);
     }
-    for (size_t i = 0; i < 10; ++i) {
+    for (size_t i = 0; i < 16; ++i) {
         fputs("-", file);
     }
     fputs("\n", file);
@@ -316,11 +316,12 @@ static void PrintSeparator_(FILE *file, size_t columns) {
 
 static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t results_size, size_t idx) {
     const size_t test_sum = GetTestCount_();
+    fprintf(file, "Performance Matrix:\n\n");
 
-    /* Print upper header - 8 char wide column */
-    fputs(" row/col  |", file);
+    /* Print upper header - 16 char wide column */
+    fputs(" row/col        |", file);
     for (size_t i = 0; i < test_sum; ++i) {
-        fprintf(file, " %8lu ", i);
+        fprintf(file, " %14lu ", i);
 
         if (i != test_sum - 1) {
             fputs("|", file);
@@ -331,13 +332,13 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
     PrintSeparator_(file, test_sum);
 
     for (size_t i = 0; i < test_sum; ++i) {
-        /* Print left header - 8 char wide column */
-        fprintf(file, " %8lu |", i);
+        /* Print left header - 16 char wide column */
+        fprintf(file, " %14lu |", i);
 
         for (size_t ii = 0; ii < test_sum; ++ii) {
             if (ii > i) {
                 /* We are in the upper triangle */
-                fputs("          ", file);
+                fputs("                ", file);
 
                 if (ii != test_sum - 1) {
                     fputs("|", file);
@@ -356,7 +357,7 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
             const double coef =
                 (double) measurement_row.time_ns / (double) measurement_col.time_ns;
 
-            fprintf(file, " %8.2f ", coef);
+            fprintf(file, " %14.4f ", coef);
 
             if (ii != test_sum - 1) {
                 fputs("|", file);
@@ -370,6 +371,8 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
             PrintSeparator_(file, test_sum);
         }
     }
+
+    fputs("\n", file);
 }
 
 // ------------------------------
