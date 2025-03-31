@@ -30,7 +30,83 @@ app_state_t g_AppState = {
 // Static functions
 // ------------------------------
 
+static int ParseSingleDouble_(FILE *file, data_ptr_t data) {
+    assert(file != NULL);
+    assert(data != NULL);
+}
+
+static int ParseDiameters_(FILE *file, data_ptr_t data) {
+}
+
+static void ParseResultData_(const char *filename, data_ptr_t data) {
+    assert(filename != NULL);
+    assert(data != NULL);
+
+    TRACE_INFO("Parsing result data for file: %s", filename);
+
+    char diameters_name[256];
+    snprintf(diameters_name, 256, "%s" FILE_PATH_SEPARATOR "diameters.txt", filename);
+
+    char surface_area_name[256];
+    snprintf(surface_area_name, 256, "%s" FILE_PATH_SEPARATOR "surface_area.txt", filename);
+
+    char volume_name[256];
+    snprintf(volume_name, 256, "%s" FILE_PATH_SEPARATOR "volume.txt", filename);
+
+    FILE *diameters_file = fopen(diameters_name, "r");
+    FILE *surface_area_file = fopen(surface_area_name, "r");
+    FILE *volume_file = fopen(volume_name, "r");
+
+    if (diameters_file == NULL || surface_area_file == NULL || volume_file == NULL) {
+        if (diameters_file == NULL) {
+            printf("[ ERROR ] Failed to open diameters file: %s\n", diameters_name);
+        }
+
+        if (surface_area_file == NULL) {
+            printf("[ ERROR ] Failed to open surface area file: %s\n", surface_area_name);
+        }
+
+        if (volume_file == NULL) {
+            printf("[ ERROR ] Failed to open volume file: %s\n", volume_name);
+        }
+
+        goto CLEANUP;
+    }
+
+    const int volume_read_result = ParseSingleDouble_(volume_file, data);
+    const int surface_area_read_result = ParseSingleDouble_(surface_area_file, data);
+    const int diameters_read_result = ParseDiameters_(diameters_file, data);
+
+    if (volume_read_result != 0 || surface_area_read_result != 0 || diameters_read_result != 0) {
+        if (volume_read_result != 0) {
+            printf("[ ERROR ] Failed to parse volume file: %s\n", volume_name);
+        }
+
+        if (surface_area_read_result != 0) {
+            printf("[ ERROR ] Failed to parse surface area file: %s\n", surface_area_name);
+        }
+
+        if (diameters_read_result != 0) {
+            printf("[ ERROR ] Failed to parse diameters file: %s\n", diameters_name);
+        }
+
+        goto CLEANUP;
+    }
+
+    /* Mark that result is provided */
+    data->is_result_provided = 1;
+
+CLEANUP:
+    if (diameters_file != NULL) { fclose(diameters_file); }
+    if (surface_area_file != NULL) { fclose(surface_area_file); }
+    if (volume_file != NULL) { fclose(volume_file); }
+}
+
 static void ValidateResult_(test_result_t *test_result, data_ptr_t data, result_t *result) {
+    assert(test_result != NULL);
+    assert(data != NULL);
+    assert(result != NULL);
+
     if (fabs(result->surface_area - data->result.surface_area) > TEST_ACCURACY) {
         char buffer[256];
         snprintf(buffer, sizeof(buffer),
@@ -70,6 +146,8 @@ static void ValidateResult_(test_result_t *test_result, data_ptr_t data, result_
 }
 
 static result_t RunTestOnDefaultFunc_(data_ptr_t data) {
+    assert(data != NULL);
+
     TRACE_INFO("Running test on default function...");
 
     test_result_t *test_result = AllocResults();
@@ -107,6 +185,8 @@ static result_t RunTestOnDefaultFunc_(data_ptr_t data) {
 }
 
 static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
+    assert(data != NULL);
+
     TRACE_INFO("Running test on function with idx: %lu", idx);
 
     shape_func_t func = g_ShapeFunctions[idx];
@@ -139,6 +219,8 @@ static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
 }
 
 static void RunTest_(const char *input) {
+    assert(input != NULL);
+
     printf("Processing test for file: %s\n", input);
 
     data_ptr_t data = ParseData(input);
@@ -321,10 +403,21 @@ test_result_t *AllocResults() {
 }
 
 data_ptr_t ParseData(const char *filename) {
+    data_ptr_t data = (data_ptr_t) malloc(sizeof(data_t));
 
+    if (data == NULL) {
+        FailApplication("Failed to allocate memory for data...");
+    }
+
+    ParseResultData_(filename, data);
+    LoadNumpyArrays(filename, data);
+
+    return data;
 }
 
 void CleanupData(data_ptr_t data) {
+    assert(data != NULL);
+
     free(data->spacing);
     free(data->strides);
     free(data->size);

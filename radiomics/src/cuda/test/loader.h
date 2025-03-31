@@ -32,6 +32,6 @@ typedef data_t *data_ptr_t;
 // Core functions
 // ------------------------------
 
-void LoadNumpyArrays(data_ptr_t data);
+void LoadNumpyArrays(const char* filename, data_ptr_t data);
 
 #endif //LOADER_H

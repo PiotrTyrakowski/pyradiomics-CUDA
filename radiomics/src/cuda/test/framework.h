@@ -49,7 +49,7 @@ typedef struct app_state {
     size_t results_counter;
 } app_state_t;
 
-#define FILE_PATH_SEPARATOR '/'
+#define FILE_PATH_SEPARATOR "/"
 
 // ------------------------------
 // Data functions
