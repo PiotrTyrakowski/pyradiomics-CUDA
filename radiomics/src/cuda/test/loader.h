@@ -6,6 +6,7 @@
 // ------------------------------
 
 #define DIAMETERS_SIZE 4
+#define EXPECTED_DIMENSION 3
 
 typedef struct result {
     /* Results */
@@ -18,9 +19,10 @@ typedef struct result {
 typedef struct data {
     /* Arguments */
     char *mask;
-    int *size;
-    int *strides;
     double *spacing;
+
+    int size[EXPECTED_DIMENSION];
+    int strides[EXPECTED_DIMENSION];
 
     unsigned char is_result_provided;
     result_t result;
@@ -32,6 +34,6 @@ typedef data_t *data_ptr_t;
 // Core functions
 // ------------------------------
 
-void LoadNumpyArrays(const char* filename, data_ptr_t data);
+int LoadNumpyArrays(const char* filename, data_ptr_t data);
 
 #endif //LOADER_H

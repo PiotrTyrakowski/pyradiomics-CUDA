@@ -6,6 +6,7 @@
 #include <memory.h>
 #include <time.h>
 #include <float.h>
+#include <errno.h>
 
 #include <test.cuh>
 #include <cshape.h>
@@ -32,9 +33,9 @@ app_state_t g_AppState = {
 
 #define TOO_LONG_FILE_LENGTH 1024
 
-static int ParseSingleDouble_(FILE *file, data_ptr_t data) {
+static int ParseSingleDouble_(FILE *file, double *out_ptr) {
     assert(file != NULL);
-    assert(data != NULL);
+    assert(out_ptr != NULL);
 
     /* Check length of the file */
     fseek(file, 0, SEEK_END);
@@ -51,11 +52,33 @@ static int ParseSingleDouble_(FILE *file, data_ptr_t data) {
         return 1;
     }
 
-    
+    errno = 0;
+    const double num = strtod(buffer, NULL);
+
+    if (errno != 0) {
+        return 1;
+    }
+
+    *out_ptr = num;
+    return 0;
 }
 
 static int ParseDiameters_(FILE *file, data_ptr_t data) {
+    assert(file != NULL);
+    assert(data != NULL);
+
+    double values[4];
+    if (fscanf(file, "(%lf, %lf, %lf, %lf)",
+               data->result.diameters,
+               data->result.diameters + 1,
+               data->result.diameters + 2,
+               data->result.diameters + 3) != 4) {
+        return 1;
+    }
+
+    return 0; // Success
 }
+
 
 static void ParseResultData_(const char *filename, data_ptr_t data) {
     assert(filename != NULL);
@@ -92,8 +115,8 @@ static void ParseResultData_(const char *filename, data_ptr_t data) {
         goto CLEANUP;
     }
 
-    const int volume_read_result = ParseSingleDouble_(volume_file, data);
-    const int surface_area_read_result = ParseSingleDouble_(surface_area_file, data);
+    const int volume_read_result = ParseSingleDouble_(volume_file, &data->result.volume);
+    const int surface_area_read_result = ParseSingleDouble_(surface_area_file, &data->result.surface_area);
     const int diameters_read_result = ParseDiameters_(diameters_file, data);
 
     if (volume_read_result != 0 || surface_area_read_result != 0 || diameters_read_result != 0) {
@@ -243,6 +266,11 @@ static void RunTest_(const char *input) {
     printf("Processing test for file: %s\n", input);
 
     data_ptr_t data = ParseData(input);
+
+    if (data == NULL) {
+        TRACE_ERROR("Failed to parse data from file: %s", input);
+        return;
+    }
 
     RunTestOnDefaultFunc_(data);
     for (size_t idx = 0; idx < MAX_SOL_FUNCTIONS; ++idx) {
@@ -429,7 +457,12 @@ data_ptr_t ParseData(const char *filename) {
     }
 
     ParseResultData_(filename, data);
-    LoadNumpyArrays(filename, data);
+    if (LoadNumpyArrays(filename, data)) {
+        /* LoadNumpyArrays should report errors */
+
+        free(data);
+        return NULL;
+    }
 
     return data;
 }
@@ -438,8 +471,6 @@ void CleanupData(data_ptr_t data) {
     assert(data != NULL);
 
     free(data->spacing);
-    free(data->strides);
-    free(data->size);
     free(data->mask);
     free(data);
 }

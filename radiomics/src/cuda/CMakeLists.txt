@@ -38,6 +38,22 @@ target_include_directories(PYRADIOMICS PRIVATE ${Python3_INCLUDE_DIRS})
 target_link_libraries(PYRADIOMICS PRIVATE ${Python3_LIBRARIES})
 
 # ------------------------------
+# Numpy
+# ------------------------------
+
+execute_process(
+        COMMAND ${Python3_EXECUTABLE} -c "import numpy; print(numpy.get_include())"
+        OUTPUT_VARIABLE NUMPY_INCLUDE_DIR
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+if (NOT NUMPY_INCLUDE_DIR)
+    message(FATAL_ERROR "NumPy include directory not found")
+endif ()
+
+message(STATUS "NumPy include directory: ${NUMPY_INCLUDE_DIR}")
+
+# ------------------------------
 # C test application
 # ------------------------------
 
@@ -53,6 +69,14 @@ target_link_libraries(TEST_APP PRIVATE
         CUDA_LIB
         PYRADIOMICS
 )
+
+target_include_directories(TEST_APP PRIVATE
+        ${Python3_INCLUDE_DIRS}
+        ${NUMPY_INCLUDE_DIR}
+)
+
+target_link_libraries(TEST_APP PRIVATE ${Python3_LIBRARIES})
+
 
 # ------------------------------
 # Flags config
