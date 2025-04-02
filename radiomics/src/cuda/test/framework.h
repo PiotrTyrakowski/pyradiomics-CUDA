@@ -99,14 +99,13 @@ void RunTests();
 
 void FinalizeTesting();
 
-test_result_t *AllocResults(char *name);
+test_result_t *AllocResults();
 
-#define PREPARE_TEST_RESULT(...) \
-    test_result_t *test_result; \
+#define PREPARE_TEST_RESULT(test_result, ...) \
     do { \
         char *name = (char *) malloc(256); \
         snprintf(name, 256, __VA_ARGS__); \
-        test_result = AllocResults(name); \
+        test_result->function_name = name; \
     } while (0)
 
 data_ptr_t ParseData(const char *filename);

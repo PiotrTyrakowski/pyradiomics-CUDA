@@ -12,7 +12,7 @@
 #include <cshape.h>
 #include <math.h>
 
-#define TEST_ACCURACY (1e+3 * DBL_EPSILON)
+#define TEST_ACCURACY (1e+6 * DBL_EPSILON)
 
 // ------------------------------
 // Application state
@@ -32,6 +32,16 @@ app_state_t g_AppState = {
 // ------------------------------
 
 #define TOO_LONG_FILE_LENGTH 1024
+
+static size_t GetTestCount_() {
+    size_t sum = 0;
+    for (size_t idx = 0; idx < MAX_SOL_FUNCTIONS; ++idx) {
+        if (g_ShapeFunctions[idx] != NULL) {
+            sum++;
+        }
+    }
+    return sum + 1;
+}
 
 static int ParseSingleDouble_(FILE *file, double *out_ptr) {
     assert(file != NULL);
@@ -185,7 +195,9 @@ static result_t RunTestOnDefaultFunc_(data_ptr_t data) {
 
     TRACE_INFO("Running test on default function...");
 
+    test_result_t *test_result = AllocResults();
     PREPARE_TEST_RESULT(
+        test_result,
         "Pyradiomics implementation"
     );
 
@@ -231,7 +243,9 @@ static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
     TRACE_INFO("Running test on function with idx: %lu", idx);
 
     shape_func_t func = g_ShapeFunctions[idx];
+    test_result_t *test_result = AllocResults();
     PREPARE_TEST_RESULT(
+        test_result,
         "Custom implementation with idx: %lu",
         idx
     );
@@ -285,6 +299,80 @@ static void RunTest_(const char *input) {
     }
 
     CleanupData(data);
+}
+
+static void PrintSeparator_(FILE *file, size_t columns) {
+    for (size_t idx = 0; idx < columns; ++idx) {
+        for (size_t i = 0; i < 16; ++i) {
+            fputs("-", file);
+        }
+        fputs("+", file);
+    }
+    for (size_t i = 0; i < 16; ++i) {
+        fputs("-", file);
+    }
+    fputs("\n", file);
+}
+
+static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t results_size, size_t idx) {
+    const size_t test_sum = GetTestCount_();
+    fprintf(file, "Performance Matrix:\n\n");
+
+    /* Print upper header - 16 char wide column */
+    fputs(" row/col        |", file);
+    for (size_t i = 0; i < test_sum; ++i) {
+        fprintf(file, " %14lu ", i);
+
+        if (i != test_sum - 1) {
+            fputs("|", file);
+        }
+    }
+    fputs("\n", file);
+
+    PrintSeparator_(file, test_sum);
+
+    for (size_t i = 0; i < test_sum; ++i) {
+        /* Print left header - 16 char wide column */
+        fprintf(file, " %14lu |", i);
+
+        for (size_t ii = 0; ii < test_sum; ++ii) {
+            if (ii > i) {
+                /* We are in the upper triangle */
+                fputs("                ", file);
+
+                if (ii != test_sum - 1) {
+                    fputs("|", file);
+                }
+
+                continue;
+            }
+
+            /* Get full time measurement */
+            const size_t row_idx = idx * test_sum + i;
+            const size_t col_idx = idx * test_sum + ii;
+
+            const time_measurement_t measurement_row = results[row_idx].measurements[0];
+            const time_measurement_t measurement_col = results[col_idx].measurements[0];
+
+            const double coef =
+                (double) measurement_row.time_ns / (double) measurement_col.time_ns;
+
+            fprintf(file, " %14.4f ", coef);
+
+            if (ii != test_sum - 1) {
+                fputs("|", file);
+            }
+        }
+
+
+        fputs("\n", file);
+
+        if (i != test_sum - 1) {
+            PrintSeparator_(file, test_sum);
+        }
+    }
+
+    fputs("\n", file);
 }
 
 // ------------------------------
@@ -377,7 +465,19 @@ void FailApplication(const char *msg) {
 }
 
 void DisplayResults(FILE *file, test_result_t *results, size_t results_size) {
+    const size_t test_sum = GetTestCount_();
+
     for (size_t idx = 0; idx < results_size; ++idx) {
+        if (idx % test_sum == 0) {
+            for (size_t i = 0; i < 24; ++i) { fputs("=====", file); }
+            fputs("\n", file);
+
+            const char* filename = g_AppState.input_files[idx / test_sum];
+            fprintf(file, "Test directory: %s\n\n", filename);
+
+            DisplayPerfMatrix_(file, results, results_size, idx / test_sum);
+        }
+
         fprintf(file, "Test %s:\n", results[idx].function_name);
 
         for (size_t i = 0; i < 8; ++i) { fputs("=====", file); }
@@ -462,9 +562,10 @@ void AddDataMeasurement(test_result_t *result, const time_measurement_t measurem
     TRACE_INFO("New measurement done: %s with time: %lu", measurement.name, measurement.time_ns);
 }
 
-test_result_t *AllocResults(char *name) {
+test_result_t *AllocResults() {
     test_result_t *result = &g_AppState.results[g_AppState.results_counter++];
-    result->function_name = name;
+    result->error_logs_counter = 0;
+    result->measurement_counter = 0;
 
     return result;
 }

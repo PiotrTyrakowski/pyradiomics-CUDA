@@ -33,12 +33,15 @@ extern "C" shape_2D_func_t g_Shape2DFunctions[MAX_SOL_FUNCTIONS];
 int AddShape2DFunction(size_t idx, shape_2D_func_t func);
 int AddShapeFunction(size_t idx, shape_func_t func);
 
+#define SOLUTION_NAME(number) \
+    calculate_coefficients_cuda_##number
+
 #define SOLUTION_DECL(number) \
-    int calculate_coefficients_cuda_##number(char *mask, int *size, int *strides, double *spacing, \
+    int SOLUTION_NAME(number)(char *mask, int *size, int *strides, double *spacing, \
                 double *surfaceArea, double *volume, double *diameters)                            \
 
 #define REGISTER_SOLUTION(number) \
-    AddShapeFunction(number, calculate_coefficients_cuda_##number)
+    AddShapeFunction(number, SOLUTION_NAME(number))
 
 #define SOLUTION_2D_DECL(number) \
     int calculate_coefficients2D_cuda_##number(char *mask, int *size, int *strides, double *spacing, \
