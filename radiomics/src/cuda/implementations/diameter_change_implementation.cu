@@ -1,7 +1,6 @@
 #include "helpers.cuh"
 #include "test.cuh"
 
-#include <crt/math_functions.h>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <math.h>
@@ -357,19 +356,21 @@ __global__ void calculate_meshDiameter_kernel(
       double dist_sq = dx * dx + dy * dy + dz * dz;
 
       // Update thread-local maximum 3D distance
-      // Using fmax to avoid potential branch divergence, though an if might be
-      // fine too
-      thread_max_dist_sq_3D = fmax(thread_max_dist_sq_3D, dist_sq);
+      thread_max_dist_sq_3D =
+          thread_max_dist_sq_3D > dist_sq ? thread_max_dist_sq_3D : dist_sq;
 
       // Update thread-local plane-specific maximums
       if (ix == jx) { // YZ plane
-        thread_max_dist_sq_YZ = fmax(thread_max_dist_sq_YZ, dist_sq);
+        thread_max_dist_sq_YZ =
+            thread_max_dist_sq_YZ > dist_sq ? thread_max_dist_sq_YZ : dist_sq;
       }
       if (iy == jy) { // XZ plane
-        thread_max_dist_sq_XZ = fmax(thread_max_dist_sq_XZ, dist_sq);
+        thread_max_dist_sq_XZ =
+            thread_max_dist_sq_XZ > dist_sq ? thread_max_dist_sq_XZ : dist_sq;
       }
       if (iz == jz) { // XY plane
-        thread_max_dist_sq_XY = fmax(thread_max_dist_sq_XY, dist_sq);
+        thread_max_dist_sq_XY =
+            thread_max_dist_sq_XY > dist_sq ? thread_max_dist_sq_XY : dist_sq;
       }
     }
   }

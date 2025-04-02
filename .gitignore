@@ -60,6 +60,7 @@ docs/_build/
 # IDE junk
 .idea/*
 *.swp
+.vscode
 
 # PyBuilder
 target/
