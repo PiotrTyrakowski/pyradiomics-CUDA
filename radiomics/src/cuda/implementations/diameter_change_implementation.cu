@@ -1,6 +1,7 @@
 #include "helpers.cuh"
 #include "test.cuh"
 
+#include <crt/math_functions.h>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <math.h>
@@ -327,8 +328,13 @@ __global__ void calculate_meshDiameter_kernel(
   int global_tid = blockIdx.x * blockDim.x + threadIdx.x;
   int num_threads = gridDim.x * blockDim.x;
 
+  // Thread-local variables to store the maximums found by this thread
+  double thread_max_dist_sq_YZ = 0.0;
+  double thread_max_dist_sq_XZ = 0.0;
+  double thread_max_dist_sq_XY = 0.0;
+  double thread_max_dist_sq_3D = 0.0;
+
   // Use a grid-stride loop for the first vertex 'i'
-  // This effectively distributes the total workload (all pairs)
   for (size_t i = global_tid; i < num_vertices; i += num_threads) {
     // Get coordinates for the 'anchor' vertex 'i'
     double ix = vertices[i * 3 + 0];
@@ -350,20 +356,38 @@ __global__ void calculate_meshDiameter_kernel(
       // Calculate squared Euclidean distance
       double dist_sq = dx * dx + dy * dy + dz * dz;
 
-      // Atomically update the overall maximum squared diameter
-      atomicMax(&diameters_sq[3], dist_sq); // 3D Max
+      // Update thread-local maximum 3D distance
+      // Using fmax to avoid potential branch divergence, though an if might be
+      // fine too
+      thread_max_dist_sq_3D = fmax(thread_max_dist_sq_3D, dist_sq);
 
-      // Atomically update plane-specific maximum squared diameters
+      // Update thread-local plane-specific maximums
       if (ix == jx) { // YZ plane
-        atomicMax(&diameters_sq[0], dist_sq);
+        thread_max_dist_sq_YZ = fmax(thread_max_dist_sq_YZ, dist_sq);
       }
       if (iy == jy) { // XZ plane
-        atomicMax(&diameters_sq[1], dist_sq);
+        thread_max_dist_sq_XZ = fmax(thread_max_dist_sq_XZ, dist_sq);
       }
       if (iz == jz) { // XY plane
-        atomicMax(&diameters_sq[2], dist_sq);
+        thread_max_dist_sq_XY = fmax(thread_max_dist_sq_XY, dist_sq);
       }
     }
+  }
+
+  // After the thread has processed all its 'i' vertices,
+  // atomically update the global maximums with the thread's local maximums.
+  // Only perform atomic if the thread potentially found a non-zero distance.
+  if (thread_max_dist_sq_3D > 0.0) {
+    atomicMax(&diameters_sq[3], thread_max_dist_sq_3D);
+  }
+  if (thread_max_dist_sq_YZ > 0.0) {
+    atomicMax(&diameters_sq[0], thread_max_dist_sq_YZ);
+  }
+  if (thread_max_dist_sq_XZ > 0.0) {
+    atomicMax(&diameters_sq[1], thread_max_dist_sq_XZ);
+  }
+  if (thread_max_dist_sq_XY > 0.0) {
+    atomicMax(&diameters_sq[2], thread_max_dist_sq_XY);
   }
 }
 
@@ -565,4 +589,5 @@ cleanup:
             cudaGetErrorString(cudaStatus));
   }
   return cudaStatus;
+}
 }

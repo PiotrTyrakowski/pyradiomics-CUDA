@@ -1,0 +1,21 @@
+{
+    "imageType": {
+        "Original": {}
+    },
+    "featureClass": {
+        "shape2D": [
+            "MeshSurface",
+            "PixelSurface",
+            "MaximumDiameter",
+            "PerimeterSurfaceRatio",
+            "MinorAxisLength"
+            
+        ]
+
+    },
+    "setting": {
+        "force2D": true,
+        "force2Ddimension": 0,
+        "additionalInfo": false
+    }
+}
