@@ -1,11 +1,8 @@
 import os
-import platform
 import shutil
 import subprocess
 import sys
 
-import numpy
-import versioneer
 from distutils import ccompiler
 from distutils import sysconfig
 from distutils.errors import CompileError, LinkError  # For error handling
@@ -60,90 +57,81 @@ class CudaBuildExt(_build_ext):
     for ext in self.extensions:
       cuda_sources = []
       other_sources = []
-      is_cuda_ext = False  # Flag to track if this extension has CUDA files
 
       # Separate .cu files from other sources
       for source in ext.sources:
         if isinstance(source, str) and os.path.splitext(source)[1] == '.cu':
           cuda_sources.append(source)
-          is_cuda_ext = True  # Mark as CUDA extension
         else:
           other_sources.append(source)
 
       # If there are .cu files, compile them to .o files first
-      if is_cuda_ext:  # Check the flag
-        if not cuda_sources:
-          print(f"Warning: Extension {ext.name} marked as CUDA but no .cu files found?",
+      if not cuda_sources:
+        print(f"Warning: Extension {ext.name} marked as CUDA but no .cu files found?",
                 file=sys.stderr)
-          # Decide how to handle this - maybe skip NVCC steps?
-          # For now, we'll let it proceed, but the NVCC logic below won't run.
 
-        if cuda_sources:
-          print(f"Pre-compiling CUDA sources for extension {ext.name}...")
-          ext_build_dir = os.path.join(self.build_temp, ext.name)  # Directory for object files
-          if not os.path.exists(ext_build_dir):
-            os.makedirs(ext_build_dir)
+      if cuda_sources:
+        print(f"Pre-compiling CUDA sources for extension {ext.name}...")
+        ext_build_dir = os.path.join(self.build_temp, ext.name)
+        if not os.path.exists(ext_build_dir):
+          os.makedirs(ext_build_dir)
 
-          objects = []
-          nvcc_compile_args = []  # Store nvcc specific args separately
+        objects = []
+        nvcc_compile_args = []
 
-          # Extract nvcc-specific args if present
-          if isinstance(ext.extra_compile_args, dict) and 'nvcc' in ext.extra_compile_args:
-            nvcc_compile_args = ext.extra_compile_args['nvcc']
+        if isinstance(ext.extra_compile_args, dict) and 'nvcc' in ext.extra_compile_args:
+          nvcc_compile_args = ext.extra_compile_args['nvcc']
 
-          for cuda_src in cuda_sources:
-            base_name = os.path.basename(cuda_src)
-            obj_name = os.path.splitext(base_name)[0] + '.o'
-            obj_path = os.path.join(ext_build_dir, obj_name)
+        for cuda_src in cuda_sources:
+          base_name = os.path.basename(cuda_src)
+          obj_name = os.path.splitext(base_name)[0] + '.o'
+          obj_path = os.path.join(ext_build_dir, obj_name)
 
-            # Build the nvcc command
-            cmd = [nvcc_path, '-c', cuda_src, '-o', obj_path]
-            # Add include directories from the extension and the build command
-            all_includes = ext.include_dirs + self.include_dirs
-            for include_dir in all_includes:
-              cmd.extend(['-I', include_dir])
+          # Build the nvcc command
+          cmd = [nvcc_path, '-c', cuda_src, '-o', obj_path]
 
-            # Add Position Independent Code flag needed for shared libraries
-            cmd.append('-Xcompiler=-fPIC')
+          # Add include directories from the extension and the build command
+          all_includes = ext.include_dirs + self.include_dirs
+          for include_dir in all_includes:
+            cmd.extend(['-I', include_dir])
 
-            # Add language standard if needed
-            # cmd.append('--std=c++14') # Example
+          # Add Position Independent Code flag needed for shared libraries
+          cmd.append('-Xcompiler=-fPIC')
 
-            # Add architecture flags and other nvcc args
-            cmd.extend(nvcc_compile_args)  # Add flags collected earlier
+          # Add flags collected earlier
+          cmd.extend(nvcc_compile_args)
 
-            print(f"Running nvcc command: {' '.join(cmd)}")
-            try:
-              # Capture stderr for better diagnostics
-              result = subprocess.run(cmd, check=True, text=True, stderr=subprocess.PIPE,
-                                      stdout=subprocess.PIPE)
-              if result.stderr:
-                print(f"nvcc stderr:\n{result.stderr}", file=sys.stderr)
-            except subprocess.CalledProcessError as e:
-              print(f"ERROR: nvcc compilation failed for {cuda_src}:\n{e.stderr}", file=sys.stderr)
-              raise CompileError(f"nvcc compilation failed for {cuda_src}")
-            except FileNotFoundError:
-              print(f"ERROR: nvcc command '{nvcc_path}' not found during compilation.",
-                    file=sys.stderr)
-              raise FileNotFoundError("nvcc not found during compilation")
+          print(f"Running nvcc command: {' '.join(cmd)}")
+          try:
+            # Capture stderr for better diagnostics
+            result = subprocess.run(cmd, check=True, text=True, stderr=subprocess.PIPE,
+                                    stdout=subprocess.PIPE)
+            if result.stderr:
+              print(f"nvcc stderr:\n{result.stderr}", file=sys.stderr)
+          except subprocess.CalledProcessError as e:
+            print(f"ERROR: nvcc compilation failed for {cuda_src}:\n{e.stderr}", file=sys.stderr)
+            raise CompileError(f"nvcc compilation failed for {cuda_src}")
+          except FileNotFoundError:
+            print(f"ERROR: nvcc command '{nvcc_path}' not found during compilation.",
+                  file=sys.stderr)
+            raise FileNotFoundError("nvcc not found during compilation")
 
-            objects.append(obj_path)
+          objects.append(obj_path)
 
-        # Replace .cu sources with other sources for the C/C++ compiler
-        ext.sources = other_sources
-        # Add the compiled .o files to be linked
-        ext.extra_objects = objects  # This is the list of pre-compiled objects
+      # Replace .cu sources with other sources for the C/C++ compiler
+      ext.sources = other_sources
+      # Add the compiled .o files to be linked
+      ext.extra_objects = objects
 
-        # Ensure the C++ linker is used if CUDA was involved
-        # (nvcc usually needs g++ or similar)
-        ext.language = ext.language or 'c++'
+      # Ensure the C++ linker is used if CUDA was involved
+      ext.language = ext.language or 'c++'
 
-        # *** THE FIX ***
-        # Reset extra_compile_args for the C/C++ compiler.
-        # It expects a list, not the dict we used for nvcc args.
-        # If you had C/C++ specific flags, you'd filter them from the original
-        # dict, but here we just need an empty list.
-        ext.extra_compile_args = []
+      # *** THE FIX ***
+      # Reset extra_compile_args for the C/C++ compiler.
+      # It expects a list, not the dict we used for nvcc args.
+      # If you had C/C++ specific flags, you'd filter them from the original
+      # dict, but here we just need an empty list.
+      ext.extra_compile_args = []
 
     # Now, run the original build_extensions method.
     # It will compile the remaining .c/.cpp files and link them with the .o files
@@ -153,86 +141,93 @@ class CudaBuildExt(_build_ext):
 
 
 def get_cuda_extension():
-  # --- CUDA Extensions (Conditionally included) ---
-  cuda_extensions = []
-  if os.environ.get('BUILD_CUDA_EXTENSIONS', '0') == '1':
-    print("BUILD_CUDA_EXTENSIONS=1 found. Attempting to include CUDA extensions.")
-    cuda_src_dir = os.path.join('radiomics', 'src', 'cuda')
-    cuda_inc_dirs = incDirs + [cuda_src_dir]
+    if os.environ.get('DISABLE_CUDA_EXTENSIONS', '0') == '1':
+        print("DISABLE_CUDA_EXTENSIONS=1: skipping CUDA extension build")
+        return []
 
     # --- Determine CUDA Library Directory ---
     nvcc_path_for_libs = find_nvcc()  # Reuse find_nvcc to get path
     cuda_library_dirs = []  # Default to empty list
-    if nvcc_path_for_libs:
-      # Try to infer lib64/lib path relative to nvcc's directory
-      cuda_root = os.path.dirname(
-        os.path.dirname(nvcc_path_for_libs))  # Go up two levels (bin -> root)
-      potential_lib_paths = [
-        os.path.join(cuda_root, 'lib64'),
-        os.path.join(cuda_root, 'lib')
-      ]
-      found_lib_dir = None
-      for lib_path in potential_lib_paths:
-        if os.path.isdir(lib_path):
-          found_lib_dir = lib_path
-          print(f"Found CUDA library directory based on nvcc path: {found_lib_dir}")
-          break
 
-      if found_lib_dir:
-        cuda_library_dirs.append(found_lib_dir)
-      else:
-        print(
-          f"Warning: Could not automatically determine CUDA library directory relative to nvcc: {nvcc_path_for_libs}. Checking CUDA_HOME/PATH.",
-          file=sys.stderr)
-        # Fallback to CUDA_HOME/PATH environment variables if relative path failed
-        cuda_home_env = os.environ.get('CUDA_HOME') or os.environ.get('CUDA_PATH')
-        if cuda_home_env:
-          potential_lib_paths_env = [
-            os.path.join(cuda_home_env, 'lib64'),
-            os.path.join(cuda_home_env, 'lib')
-          ]
-          found_lib_dir_env = None
-          for lib_path_env in potential_lib_paths_env:
-            if os.path.isdir(lib_path_env):
-              found_lib_dir_env = lib_path_env
-              print(f"Using CUDA library directory from CUDA_HOME/PATH: {found_lib_dir_env}")
-              break
-          if found_lib_dir_env:
-            cuda_library_dirs.append(found_lib_dir_env)
-          else:
+    if nvcc_path_for_libs:
+        # Try to infer lib64/lib path relative to nvcc's directory
+        cuda_root = os.path.dirname(
+            os.path.dirname(nvcc_path_for_libs))  # Go up two levels (bin -> root)
+
+        potential_lib_paths = [
+            os.path.join(cuda_root, 'lib64'),
+            os.path.join(cuda_root, 'lib')
+        ]
+
+        found_lib_dir = None
+        for lib_path in potential_lib_paths:
+            if os.path.isdir(lib_path):
+                found_lib_dir = lib_path
+                print(f"Found CUDA library directory based on nvcc path: {found_lib_dir}")
+                break
+
+        if found_lib_dir:
+            cuda_library_dirs.append(found_lib_dir)
+        else:
             print(
-              f"Warning: CUDA_HOME/PATH set ({cuda_home_env}), but could not find lib64 or lib subdir.",
-              file=sys.stderr)
+                f"Warning: Could not automatically determine CUDA library directory relative to nvcc: {nvcc_path_for_libs}. Checking CUDA_HOME/PATH.",
+                file=sys.stderr)
+
+            # Fallback to CUDA_HOME/PATH environment variables if relative path failed
+            cuda_home_env = os.environ.get('CUDA_HOME') or os.environ.get('CUDA_PATH')
+
+            if cuda_home_env:
+                potential_lib_paths_env = [
+                    os.path.join(cuda_home_env, 'lib64'),
+                    os.path.join(cuda_home_env, 'lib')
+                ]
+
+                found_lib_dir_env = None
+                for lib_path_env in potential_lib_paths_env:
+                    if os.path.isdir(lib_path_env):
+                        found_lib_dir_env = lib_path_env
+                        print(f"Using CUDA library directory from CUDA_HOME/PATH: {found_lib_dir_env}")
+                        break
+
+                if found_lib_dir_env:
+                    cuda_library_dirs.append(found_lib_dir_env)
+                else:
+                    print(
+                        f"Warning: CUDA_HOME/PATH set ({cuda_home_env}), but could not find lib64 or lib subdir.",
+                        file=sys.stderr)
 
     if not cuda_library_dirs:
-      print(
-        "Warning: CUDA library directory not found. Linking might fail if it's not in the system's default search paths.",
-        file=sys.stderr)
+        print(
+            "Warning: CUDA library directory not found. Linking might fail if it's not in the system's default search paths.",
+            file=sys.stderr)
 
     # --- Read NVCC_FLAGS from environment ---
     nvcc_flags_env = os.environ.get('NVCC_FLAGS', '')
-    nvcc_extra_args = nvcc_flags_env.split()  # Split flags by space
+    nvcc_extra_args = nvcc_flags_env.split()
+
     if nvcc_extra_args:
-      print(f"Using NVCC_FLAGS from environment: {nvcc_flags_env}")
+        print(f"Using NVCC_FLAGS from environment: {nvcc_flags_env}")
     else:
-      print("NVCC_FLAGS environment variable not set or empty. Using default nvcc options.")
-      # Optionally add default flags here if needed, e.g.:
-      # nvcc_extra_args = ['-arch=sm_60']
+        print("NVCC_FLAGS environment variable not set or empty. Using default nvcc options.")
+        nvcc_extra_args = ['-O3']
+
+    cuda_src_dir = os.path.join('radiomics', 'src', 'cuda')
 
     cuda_shape_ext = Extension(
-      "radiomics.cuda._cshape",
-      sources=[
-        os.path.join(cuda_src_dir, "_cshape.c"),
-        # CPython interface (will be compiled by C compiler)
-        os.path.join(cuda_src_dir, "cshape.cu")  # CUDA kernels (will be pre-compiled by nvcc)
-      ],
-      include_dirs=cuda_inc_dirs,
-      libraries=['cudart'],  # Link CUDA runtime library
-      library_dirs=cuda_library_dirs,
-      language='c++',  # Ensure C++ linker is used
-      extra_compile_args={'nvcc': nvcc_extra_args}
-    )
-    cuda_extensions.append(cuda_shape_ext)
+        "radiomics.cuda",
+        sources=[
+                    os.path.join(cuda_src_dir, "cshape.cu"),
+                ] + [
+                    os.path.join(cuda_src_dir, "implementations", f) for f in os.listdir(
+                os.path.join(cuda_src_dir, "implementations")
+            )
+                ],
 
-  else:
-    print("BUILD_CUDA_EXTENSIONS not set or not '1'. Building CPU extensions only.")
+        include_dirs=[cuda_src_dir],
+        libraries=['cudart'],
+        library_dirs=cuda_library_dirs,
+        language='c++',
+        extra_compile_args={'nvcc': nvcc_extra_args}
+    )
+
+    return [cuda_shape_ext]
