@@ -12,6 +12,7 @@ if platform.architecture()[0].startswith('32'):
   raise Exception('PyRadiomics requires 64 bits python')
 
 commands = versioneer.get_cmdclass()
+commands['build_ext'] = setup_cuda.CudaBuildExt
 incDirs = [sysconfig.get_python_inc(), numpy.get_include()]
 
 ext = [Extension("radiomics._cmatrices", ["radiomics/src/_cmatrices.c", "radiomics/src/cmatrices.c"],
@@ -20,7 +21,7 @@ ext = [Extension("radiomics._cmatrices", ["radiomics/src/_cmatrices.c", "radiomi
                  include_dirs=incDirs)]
 
 # May be empty if no CUDA is available or is disabled
-cuda_ext = setup_cuda.get_cuda_extensions()
+cuda_ext = setup_cuda.get_cuda_extension()
 
 setup(
   name='pyradiomics',

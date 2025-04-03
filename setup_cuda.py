@@ -9,7 +9,6 @@ from distutils.errors import CompileError, LinkError  # For error handling
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext as _build_ext
 
-
 def find_nvcc():
   # Try finding nvcc in PATH
   nvcc_path = shutil.which('nvcc')
@@ -65,11 +64,6 @@ class CudaBuildExt(_build_ext):
         else:
           other_sources.append(source)
 
-      # If there are .cu files, compile them to .o files first
-      if not cuda_sources:
-        print(f"Warning: Extension {ext.name} marked as CUDA but no .cu files found?",
-                file=sys.stderr)
-
       if cuda_sources:
         print(f"Pre-compiling CUDA sources for extension {ext.name}...")
         ext_build_dir = os.path.join(self.build_temp, ext.name)
@@ -103,14 +97,15 @@ class CudaBuildExt(_build_ext):
 
           print(f"Running nvcc command: {' '.join(cmd)}")
           try:
-            # Capture stderr for better diagnostics
             result = subprocess.run(cmd, check=True, text=True, stderr=subprocess.PIPE,
                                     stdout=subprocess.PIPE)
             if result.stderr:
               print(f"nvcc stderr:\n{result.stderr}", file=sys.stderr)
+
           except subprocess.CalledProcessError as e:
             print(f"ERROR: nvcc compilation failed for {cuda_src}:\n{e.stderr}", file=sys.stderr)
             raise CompileError(f"nvcc compilation failed for {cuda_src}")
+
           except FileNotFoundError:
             print(f"ERROR: nvcc command '{nvcc_path}' not found during compilation.",
                   file=sys.stderr)
@@ -118,24 +113,18 @@ class CudaBuildExt(_build_ext):
 
           objects.append(obj_path)
 
-      # Replace .cu sources with other sources for the C/C++ compiler
-      ext.sources = other_sources
-      # Add the compiled .o files to be linked
-      ext.extra_objects = objects
+        # Replace .cu sources with other sources for the C/C++ compiler
+        ext.sources = other_sources
 
-      # Ensure the C++ linker is used if CUDA was involved
-      ext.language = ext.language or 'c++'
+        # Add the compiled .o files to be linked
+        ext.extra_objects = objects
 
-      # *** THE FIX ***
-      # Reset extra_compile_args for the C/C++ compiler.
-      # It expects a list, not the dict we used for nvcc args.
-      # If you had C/C++ specific flags, you'd filter them from the original
-      # dict, but here we just need an empty list.
-      ext.extra_compile_args = []
+        # Ensure the C++ linker is used if CUDA was involved
+        ext.language = ext.language or 'c++'
 
-    # Now, run the original build_extensions method.
-    # It will compile the remaining .c/.cpp files and link them with the .o files
-    # specified in ext.extra_objects.
+        ext.extra_compile_args = ext.extra_compile_args.get('cxx', []) if \
+          isinstance(ext.extra_compile_args, dict) else ext.extra_compile_args
+
     print("Proceeding with standard build process for remaining sources and linking...")
     _build_ext.build_extensions(self)
 
@@ -145,14 +134,18 @@ def get_cuda_extension():
         print("DISABLE_CUDA_EXTENSIONS=1: skipping CUDA extension build")
         return []
 
+    nvcc = find_nvcc()
+    if not nvcc:
+        print("CUDA not found. Skipping CUDA extension build.")
+        return []
+
     # --- Determine CUDA Library Directory ---
-    nvcc_path_for_libs = find_nvcc()  # Reuse find_nvcc to get path
-    cuda_library_dirs = []  # Default to empty list
+    nvcc_path_for_libs = nvcc
+    cuda_library_dirs = []
 
     if nvcc_path_for_libs:
-        # Try to infer lib64/lib path relative to nvcc's directory
         cuda_root = os.path.dirname(
-            os.path.dirname(nvcc_path_for_libs))  # Go up two levels (bin -> root)
+            os.path.dirname(nvcc_path_for_libs))
 
         potential_lib_paths = [
             os.path.join(cuda_root, 'lib64'),
@@ -219,8 +212,7 @@ def get_cuda_extension():
                     os.path.join(cuda_src_dir, "cshape.cu"),
                 ] + [
                     os.path.join(cuda_src_dir, "implementations", f) for f in os.listdir(
-                os.path.join(cuda_src_dir, "implementations")
-            )
+                os.path.join(cuda_src_dir, "implementations"))
                 ],
 
         include_dirs=[cuda_src_dir],
