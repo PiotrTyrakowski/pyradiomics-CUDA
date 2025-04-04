@@ -8,15 +8,11 @@ import os
 import pkgutil
 import sys
 import tempfile
-import subprocess
 
 import numpy  # noqa: F401
 from six.moves import urllib
 
 from . import imageoperations
-from ._version import get_versions 
-
-
 
 
 def deprecated(func):
@@ -284,45 +280,30 @@ setVerbosity(logging.WARNING)
 testCases = ('brain1', 'brain2', 'breast1', 'lung1', 'lung2', 'test_wavelet_64x64x64', 'test_wavelet_37x37x37')
 
 # 3. Attempt to load and enable the C extensions.
-
 cMatrices = None  # set cMatrices to None to prevent an import error in the feature classes.
 cShape = None
 try:
-    from radiomics import _cmatrices as cMatrices  # noqa: F401
-    from radiomics import _cshape as cShape  # noqa: F401
-
+  from radiomics import _cmatrices as cMatrices  # noqa: F401
+  from radiomics import _cshape as cShape  # noqa: F401
 except ImportError as e:
-    if os.path.isdir(os.path.join(os.path.dirname(__file__), '..', 'data')):
-        # It looks like PyRadiomics is run from source (in which case "setup.py develop" must have been run)
-        logger.critical('Apparently running from root, but unable to load C extensions... '
-                        'Did you run "python setup.py build_ext --inplace"?')
-        raise Exception('Apparently running from root, but unable to load C extensions... '
-                        'Did you run "python setup.py build_ext --inplace"?')
-    else:
-        logger.critical('Error loading C extensions', exc_info=True)
-        raise e
+  if os.path.isdir(os.path.join(os.path.dirname(__file__), '..', 'data')):
+    # It looks like PyRadiomics is run from source (in which case "setup.py develop" must have been run)
+    logger.critical('Apparently running from root, but unable to load C extensions... '
+                    'Did you run "python setup.py build_ext --inplace"?')
+    raise Exception('Apparently running from root, but unable to load C extensions... '
+                    'Did you run "python setup.py build_ext --inplace"?')
+  else:
+    logger.critical('Error loading C extensions', exc_info=True)
+    raise e
 
-# 3.5 Try to import CUDA extensions if available
-cuda_available = False
-try:
-  from radiomics.cuda import cshape as cShape_cuda
-
-  # Replace calculate_coefficients with the CUDA version
-  cShape.calculate_coefficients = cShape_cuda.calculate_coefficients
-
-except ImportError as e:
-  logger.warning('CUDA extensions not available. Falling back to CPU.', exc_info=False)  # Hide traceback for cleaner log
-  logger.debug('CUDA Import Error:', exc_info=True)  # Log full error for debugging
-  cuda_available = False
-
-# 4. Enumerate features and image types (keep existing)
+# 4. Enumerate implemented feature classes and input image types available in PyRadiomics
 _featureClasses = None
 _imageTypes = None
 getFeatureClasses()
 getImageTypes()
 
-# 5. Set version (keep existing)
+# 5. Set the version using the versioneer scripts
+from ._version import get_versions  # noqa: I202
+
 __version__ = get_versions()['version']
 del get_versions
-
-logger.info(f"PyRadiomics configuration: {'GPU' if cuda_available else 'CPU'} computation; Version {__version__}")

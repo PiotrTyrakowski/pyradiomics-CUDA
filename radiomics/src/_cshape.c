@@ -5,6 +5,13 @@
 #include <numpy/arrayobject.h>
 #include "cshape.h"
 
+#ifdef CUDA_EXTENSIONS_ENABLED
+#error "GG"
+#define
+#else
+
+#endif
+
 static char module_docstring[] = "This module links to C-compiled code for efficient calculation of the surface area "
                                  "in the pyRadiomics package. It provides fast calculation using a marching cubes "
                                  "algortihm, accessed via ""calculate_surfacearea"". Arguments for this function"
