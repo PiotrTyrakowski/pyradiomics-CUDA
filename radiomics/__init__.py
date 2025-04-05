@@ -8,15 +8,11 @@ import os
 import pkgutil
 import sys
 import tempfile
-import subprocess
 
 import numpy  # noqa: F401
 from six.moves import urllib
 
 from . import imageoperations
-from ._version import get_versions 
-
-
 
 
 def deprecated(func):
@@ -263,63 +259,6 @@ def getProgressReporter(*args, **kwargs):
     return progressReporter(*args, **kwargs)
   else:
     return _DummyProgressReporter(*args, **kwargs)
-  
-def checkGpuAvailability():
-    """
-    Check if CUDA and GPU are available for computation.
-    
-    In a Google Colab environment (or other containerized environments), 
-    'lspci' may not show the GPU. Instead, we use 'nvidia-smi' to check 
-    for the presence of an NVIDIA GPU, and 'nvcc --version' to check for the 
-    CUDA toolkit.
-    
-    Returns:
-      bool: True if NVIDIA GPU and CUDA toolkit are available, False otherwise.
-    """
-    print("Checking GPU availability...")
-    has_gpu = False
-    has_cuda_tk = False
-
-    # Check for NVIDIA GPU using nvidia-smi (works well in Colab)
-    try:
-        gpu_check = subprocess.run(
-            'nvidia-smi',
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=False
-        )
-        if gpu_check.returncode == 0 and "NVIDIA" in gpu_check.stdout:
-            has_gpu = True
-            print("NVIDIA GPU found via nvidia-smi.")
-        else:
-            print("NVIDIA GPU not found via nvidia-smi.")
-    except Exception as e:
-        print(f"Error checking for GPU via nvidia-smi: {e}")
-
-    # Check for CUDA toolkit (nvcc)
-    try:
-        cuda_check = subprocess.run(
-            'nvcc --version',
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=False
-        )
-        if cuda_check.returncode == 0 and "cuda compilation tools" in cuda_check.stdout.lower():
-            has_cuda_tk = True
-            print("CUDA Toolkit (nvcc) found.")
-        else:
-            print("CUDA Toolkit (nvcc) not found or 'nvcc --version' failed.")
-    except Exception as e:
-        print(f"Error checking for CUDA toolkit via nvcc: {e}")
-
-    final_check = has_gpu and has_cuda_tk
-    print(f"GPU Availability Check Result: {final_check} (GPU: {has_gpu}, CUDA Toolkit: {has_cuda_tk})")
-    return final_check
-
 
 progressReporter = None
 
@@ -340,119 +279,31 @@ setVerbosity(logging.WARNING)
 # 2. Define the available test cases
 testCases = ('brain1', 'brain2', 'breast1', 'lung1', 'lung2', 'test_wavelet_64x64x64', 'test_wavelet_37x37x37')
 
-# 3. C Extensions Loading Logic
-cMatrices = None
+# 3. Attempt to load and enable the C extensions.
+cMatrices = None  # set cMatrices to None to prevent an import error in the feature classes.
 cShape = None
-_gpu_available_and_used = False
-
-logger.debug("Attempting to load C extensions...")
-
-# First, try to load CUDA extensions if GPU seems available
-gpu_available = checkGpuAvailability()
-
-if gpu_available: # or True: # for DEBUGING TODO delete
-    logger.debug("GPU potentially available. Trying to import CUDA C extensions...")
-    try:
-        from radiomics.cuda import _cshape as cShape_cuda
-        # from radiomics.cuda import _cmatrices as cMatrices_cuda # If you have this
-
-        # Assign the cuda module to cShape
-        cShape = cShape_cuda
-        # Add attributes with the names expected by shape.py, pointing to the _cuda versions
-        cShape.calculate_coefficients = cShape_cuda.calculate_coefficients_cuda
-        cShape.calculate_coefficients2D = cShape_cuda.calculate_coefficients2D_cuda
-
-        from radiomics import _cmatrices as cMatrices # Assuming you always have CPU cMatrices TODO : IS THAT OKAY???
-    except ImportError:
-        logger.warning('GPU available, but CUDA extensions not found or failed to import. '
-                       'Did you build with BUILD_CUDA_EXTENSIONS=1? Falling back to CPU.', exc_info=False) # Hide traceback for cleaner log
-        logger.debug('CUDA Import Error:', exc_info=True) # Log full error for debugging
-        _gpu_available_and_used = False # Ensure flag is False
-        cShape = None # Ensure cShape is None so CPU fallback occurs
-    except AttributeError as e:
-         logger.error('GPU available, but CUDA module is missing expected attributes (_cuda suffix funcs?). '
-                      'Falling back to CPU.', exc_info=True)
-         _gpu_available_and_used = False
-         cShape = None # Ensure cShape is None so CPU fallback occurs
-
-    except Exception as e:
-        logger.error('GPU available, but an unexpected error occurred importing CUDA C extensions. '
-                     'Falling back to CPU.', exc_info=True)
-        _gpu_available_and_used = False # Ensure flag is False
-        cShape = None # Ensure cShape is None so CPU fallback occurs
-
-
-# If CUDA wasn't loaded or GPU not available, load CPU extensions
-# This block now correctly handles fallback if cShape is None after CUDA attempt
-if cShape is None:
-    logger.debug("Attempting to load CPU C extensions...")
-    try:
-        # Import CPU versions
-        from radiomics import _cshape as cShape_cpu
-        from radiomics import _cmatrices as cMatrices_cpu # Assuming CPU always has both
-
-        # Assign CPU modules - they should already have the correct function names
-        cShape = cShape_cpu
-        # Only assign cMatrices if it wasn't loaded by CUDA block
-        if cMatrices is None:
-            cMatrices = cMatrices_cpu
-            logger.info('Using CPU C extensions for matrix calculations.')
-        else:
-             logger.info('Using CPU C extensions for shape, GPU (if loaded) for matrices.') # Adjust if needed
-
-        if gpu_available and not _gpu_available_and_used:
-             # Log only if GPU was available but we ended up using CPU
-             logger.info('Falling back to CPU C extensions for shape calculations.')
-        elif not gpu_available:
-             logger.info('Using CPU C extensions for shape calculations (GPU not available or not selected).')
-        # Else: GPU available and used (handled above)
-
-    except ImportError:
-        logger.critical('Failed to load critical CPU C extensions (_cshape)! PyRadiomics features requiring this may fail.', exc_info=True)
-        # Keep cShape as None
-        # Load CPU cMatrices if possible, even if cShape failed?
-        if cMatrices is None:
-            try:
-                from radiomics import _cmatrices as cMatrices_cpu
-                cMatrices = cMatrices_cpu
-                logger.info("Loaded CPU C extensions for matrices, but shape failed.")
-            except ImportError:
-                 logger.critical('Failed to load CPU C extensions for matrices as well.', exc_info=True)
-                 cMatrices = None # Ensure it's None
-        # Decide whether to raise an error or allow running without C extensions
-        # raise ImportError('Failed to load required C extensions.') # Option 1: Fail hard
-        # cShape = None # Option 2: Allow running (but shape features will fail later) - Already None
-        # cMatrices = None # Already handled
-    except Exception as e:
-        logger.critical('Unexpected error loading CPU C extensions!', exc_info=True)
-        cShape = None # Ensure None on error
-        cMatrices = None # Ensure None on error
-
-# Check if at least the basic C extensions were loaded
-# Check specifically for cShape as it's needed by the failing code
-if cShape is None:
-    logger.error("Critical C extension '_cshape' could not be loaded (neither CPU nor GPU). "
-                   "Shape features will not be available and will raise errors.")
-    # Keep cMatrices status separate if needed
-    if cMatrices is None:
-        logger.warning("C extension '_cmatrices' also failed to load. Performance may be suboptimal.")
-
-# Keep the CPU modules imported under a different name if needed for comparison/testing
 try:
-    from radiomics import _cmatrices as cMatricesCpu
-    from radiomics import _cshape as cShapeCpu
-except ImportError:
-    cMatricesCpu = None
-    cShapeCpu = None
+  from radiomics import _cmatrices as cMatrices  # noqa: F401
+  from radiomics import _cshape as cShape  # noqa: F401
+except ImportError as e:
+  if os.path.isdir(os.path.join(os.path.dirname(__file__), '..', 'data')):
+    # It looks like PyRadiomics is run from source (in which case "setup.py develop" must have been run)
+    logger.critical('Apparently running from root, but unable to load C extensions... '
+                    'Did you run "python setup.py build_ext --inplace"?')
+    raise Exception('Apparently running from root, but unable to load C extensions... '
+                    'Did you run "python setup.py build_ext --inplace"?')
+  else:
+    logger.critical('Error loading C extensions', exc_info=True)
+    raise e
 
-# 4. Enumerate features and image types (keep existing)
+# 4. Enumerate implemented feature classes and input image types available in PyRadiomics
 _featureClasses = None
 _imageTypes = None
 getFeatureClasses()
 getImageTypes()
 
-# 5. Set version (keep existing)
+# 5. Set the version using the versioneer scripts
+from ._version import get_versions  # noqa: I202
+
 __version__ = get_versions()['version']
 del get_versions
-
-logger.info(f"PyRadiomics configuration: {'GPU' if _gpu_available_and_used else 'CPU'} computation; Version {__version__}")

@@ -11,11 +11,13 @@
 // Data tables
 // ------------------------------
 
-__constant__ int d_gridAngles[8][3] = {{0, 0, 0}, {0, 0, 1}, {0, 1, 1},
-                                       {0, 1, 0}, {1, 0, 0}, {1, 0, 1},
-                                       {1, 1, 1}, {1, 1, 0}};
+static __constant__ int d_gridAngles[8][3] = {
+    {0, 0, 0}, {0, 0, 1}, {0, 1, 1},
+    {0, 1, 0}, {1, 0, 0}, {1, 0, 1},
+    {1, 1, 1}, {1, 1, 0}
+};
 
-__constant__ int d_triTable[128][16] = {
+static __constant__ int d_triTable[128][16] = {
     {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
     {0, 8, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
     {1, 9, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
@@ -143,233 +145,234 @@ __constant__ int d_triTable[128][16] = {
     {8, 9, 6, 6, 7, 8, 1, 6, 9, 11, 6, 3, 1, 3, 6, -1},
     {0, 9, 1, 6, 7, 11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
     {0, 7, 8, 7, 0, 6, 0, 3, 11, 11, 6, 0, -1, -1, -1, -1},
-    {6, 7, 11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}};
+    {6, 7, 11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}
+};
 
-__constant__ double d_vertList[12][3] = {
+static __constant__ double d_vertList[12][3] = {
     {0.0, 0.0, 0.5}, {0.0, 0.5, 1.0}, {0.0, 1.0, 0.5}, {0.0, 0.5, 0.0},
     {1.0, 0.0, 0.5}, {1.0, 0.5, 1.0}, {1.0, 1.0, 0.5}, {1.0, 0.5, 0.0},
-    {0.5, 0.0, 0.0}, {0.5, 0.0, 1.0}, {0.5, 1.0, 1.0}, {0.5, 1.0, 0.0}};
+    {0.5, 0.0, 0.0}, {0.5, 0.0, 1.0}, {0.5, 1.0, 1.0}, {0.5, 1.0, 0.0}
+};
 
 // ------------------------------
 // CUDA Kernels
 // ------------------------------
 
-__global__ void calculate_coefficients_kernel(
+static __global__ void calculate_coefficients_kernel(
     const char *mask, const int *size, const int *strides,
     const double *spacing, double *surfaceArea, double *volume,
     double *vertices, unsigned long long *vertex_count, size_t max_vertices) {
+    // Calculate global thread indices
+    int ix = blockIdx.x * blockDim.x + threadIdx.x;
+    int iy = blockIdx.y * blockDim.y + threadIdx.y;
+    int iz = blockIdx.z * blockDim.z + threadIdx.z;
 
-  // Calculate global thread indices
-  int ix = blockIdx.x * blockDim.x + threadIdx.x;
-  int iy = blockIdx.y * blockDim.y + threadIdx.y;
-  int iz = blockIdx.z * blockDim.z + threadIdx.z;
-
-  // Bounds check: Ensure the indices are within the valid range for cube
-  // origins
-  if (iz >= size[0] - 1 || iy >= size[1] - 1 || ix >= size[2] - 1) {
-    return;
-  }
-
-  // --- Calculate Cube Index ---
-  unsigned char cube_idx = 0;
-  for (int a_idx = 0; a_idx < 8; a_idx++) {
-    // Calculate the linear index for each corner of the cube
-    int corner_idx = (iz + d_gridAngles[a_idx][0]) * strides[0] +
-                     (iy + d_gridAngles[a_idx][1]) * strides[1] +
-                     (ix + d_gridAngles[a_idx][2]) * strides[2];
-
-    if (mask[corner_idx]) {
-      cube_idx |= (1 << a_idx);
-    }
-  }
-
-  // --- Symmetry Optimization & Skipping ---
-  int sign_correction = 1;
-  if (cube_idx & 0x80) {
-    // If the 8th bit (corresponding to point p7) is set
-    cube_idx ^= 0xff;     // Flip all bits
-    sign_correction = -1; // Correct sign for volume calculation
-  }
-
-  // Skip cubes entirely inside or outside (index 0 after potential flip)
-  if (cube_idx == 0) {
-    return;
-  }
-
-  // --- Store Vertices for Diameter Calculation ---
-  // Store vertices on edges 6, 7, 11 if the corresponding points (bits 6, 4, 3)
-  // are set in the *potentially flipped* cube_idx, matching the C code logic.
-  int num_new_vertices = 0;
-  double new_vertices_local[3 * 3]; // Max 3 vertices * 3 coordinates
-
-  // Check bit 6 (original point p6, edge 6) using potentially flipped cube_idx
-  if (cube_idx & (1 << 6)) {
-    int edge_idx = 6;
-    new_vertices_local[num_new_vertices * 3 + 0] =
-        (((double)iz) + d_vertList[edge_idx][0]) * spacing[0];
-    new_vertices_local[num_new_vertices * 3 + 1] =
-        (((double)iy) + d_vertList[edge_idx][1]) * spacing[1];
-    new_vertices_local[num_new_vertices * 3 + 2] =
-        (((double)ix) + d_vertList[edge_idx][2]) * spacing[2];
-    num_new_vertices++;
-  }
-
-  // Check bit 4 (original point p4, edge 7) using potentially flipped cube_idx
-  if (cube_idx & (1 << 4)) {
-    // Corresponds to points_edges[0][1] in C code
-    int edge_idx = 7; // Corresponds to points_edges[1][1] in C code
-    new_vertices_local[num_new_vertices * 3 + 0] =
-        (((double)iz) + d_vertList[edge_idx][0]) * spacing[0];
-    new_vertices_local[num_new_vertices * 3 + 1] =
-        (((double)iy) + d_vertList[edge_idx][1]) * spacing[1];
-    new_vertices_local[num_new_vertices * 3 + 2] =
-        (((double)ix) + d_vertList[edge_idx][2]) * spacing[2];
-    num_new_vertices++;
-  }
-
-  // Check bit 3 (original point p3, edge 11) using potentially flipped cube_idx
-  if (cube_idx & (1 << 3)) {
-    // Corresponds to points_edges[0][2] in C code
-    int edge_idx = 11; // Corresponds to points_edges[1][2] in C code
-    new_vertices_local[num_new_vertices * 3 + 0] =
-        (((double)iz) + d_vertList[edge_idx][0]) * spacing[0];
-    new_vertices_local[num_new_vertices * 3 + 1] =
-        (((double)iy) + d_vertList[edge_idx][1]) * spacing[1];
-    new_vertices_local[num_new_vertices * 3 + 2] =
-        (((double)ix) + d_vertList[edge_idx][2]) * spacing[2];
-    num_new_vertices++;
-  }
-
-  // Atomically reserve space and store vertices if any were found
-  if (num_new_vertices > 0) {
-    unsigned long long start_v_idx =
-        atomicAdd(vertex_count, (unsigned long long)num_new_vertices);
-    // Check for buffer overflow before writing
-    if (start_v_idx + num_new_vertices <= max_vertices) {
-      for (int v = 0; v < num_new_vertices; ++v) {
-        unsigned long long write_idx = start_v_idx + v;
-        vertices[write_idx * 3 + 0] = new_vertices_local[v * 3 + 0];
-        vertices[write_idx * 3 + 1] = new_vertices_local[v * 3 + 1];
-        vertices[write_idx * 3 + 2] = new_vertices_local[v * 3 + 2];
-      }
-    }
-    // If overflow occurs, the vertex_count will exceed max_vertices, handled in
-    // host code.
-  }
-
-  // --- Process Triangles for Surface Area and Volume ---
-  double local_SA = 0;
-  double local_Vol = 0;
-
-  int t = 0;
-  // Iterate through triangles defined in d_triTable for the current cube_idx
-  while (d_triTable[cube_idx][t * 3] >= 0) {
-    double p1[3], p2[3], p3[3];    // Triangle vertex coordinates
-    double v1[3], v2[3], cross[3]; // Vectors for calculations
-
-    // Get vertex indices from the table
-    int v_idx_1 = d_triTable[cube_idx][t * 3];
-    int v_idx_2 = d_triTable[cube_idx][t * 3 + 1];
-    int v_idx_3 = d_triTable[cube_idx][t * 3 + 2];
-
-    // Calculate absolute coordinates for each vertex
-    for (int d = 0; d < 3; ++d) {
-      p1[d] = (((double)(d == 0 ? iz : (d == 1 ? iy : ix))) +
-               d_vertList[v_idx_1][d]) *
-              spacing[d];
-      p2[d] = (((double)(d == 0 ? iz : (d == 1 ? iy : ix))) +
-               d_vertList[v_idx_2][d]) *
-              spacing[d];
-      p3[d] = (((double)(d == 0 ? iz : (d == 1 ? iy : ix))) +
-               d_vertList[v_idx_3][d]) *
-              spacing[d];
+    // Bounds check: Ensure the indices are within the valid range for cube
+    // origins
+    if (iz >= size[0] - 1 || iy >= size[1] - 1 || ix >= size[2] - 1) {
+        return;
     }
 
-    // Volume contribution: (p1 x p2) . p3 (adjust sign later)
-    cross[0] = (p1[1] * p2[2]) - (p2[1] * p1[2]);
-    cross[1] = (p1[2] * p2[0]) - (p2[2] * p1[0]);
-    cross[2] = (p1[0] * p2[1]) - (p2[0] * p1[1]);
-    local_Vol += cross[0] * p3[0] + cross[1] * p3[1] + cross[2] * p3[2];
+    // --- Calculate Cube Index ---
+    unsigned char cube_idx = 0;
+    for (int a_idx = 0; a_idx < 8; a_idx++) {
+        // Calculate the linear index for each corner of the cube
+        int corner_idx = (iz + d_gridAngles[a_idx][0]) * strides[0] +
+                         (iy + d_gridAngles[a_idx][1]) * strides[1] +
+                         (ix + d_gridAngles[a_idx][2]) * strides[2];
 
-    // Surface Area contribution: 0.5 * |(p2-p1) x (p3-p1)|
-    for (int d = 0; d < 3; ++d) {
-      v1[d] = p2[d] - p1[d]; // Vector from p1 to p2
-      v2[d] = p3[d] - p1[d]; // Vector from p1 to p3
+        if (mask[corner_idx]) {
+            cube_idx |= (1 << a_idx);
+        }
     }
 
-    cross[0] = (v1[1] * v2[2]) - (v2[1] * v1[2]);
-    cross[1] = (v1[2] * v2[0]) - (v2[2] * v1[0]);
-    cross[2] = (v1[0] * v2[1]) - (v2[0] * v1[1]);
+    // --- Symmetry Optimization & Skipping ---
+    int sign_correction = 1;
+    if (cube_idx & 0x80) {
+        // If the 8th bit (corresponding to point p7) is set
+        cube_idx ^= 0xff; // Flip all bits
+        sign_correction = -1; // Correct sign for volume calculation
+    }
 
-    double mag_sq =
-        cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2];
-    local_SA += 0.5 * sqrt(mag_sq); // Add area of this triangle
+    // Skip cubes entirely inside or outside (index 0 after potential flip)
+    if (cube_idx == 0) {
+        return;
+    }
 
-    t++; // Move to the next triangle for this cube
-  }
+    // --- Store Vertices for Diameter Calculation ---
+    // Store vertices on edges 6, 7, 11 if the corresponding points (bits 6, 4, 3)
+    // are set in the *potentially flipped* cube_idx, matching the C code logic.
+    int num_new_vertices = 0;
+    double new_vertices_local[3 * 3]; // Max 3 vertices * 3 coordinates
 
-  // Atomically add the calculated contributions for this cube to the global
-  // totals
-  atomicAdd(surfaceArea, local_SA);
-  atomicAdd(volume,
-            sign_correction * local_Vol); // Apply sign correction for volume
+    // Check bit 6 (original point p6, edge 6) using potentially flipped cube_idx
+    if (cube_idx & (1 << 6)) {
+        int edge_idx = 6;
+        new_vertices_local[num_new_vertices * 3 + 0] =
+                (((double) iz) + d_vertList[edge_idx][0]) * spacing[0];
+        new_vertices_local[num_new_vertices * 3 + 1] =
+                (((double) iy) + d_vertList[edge_idx][1]) * spacing[1];
+        new_vertices_local[num_new_vertices * 3 + 2] =
+                (((double) ix) + d_vertList[edge_idx][2]) * spacing[2];
+        num_new_vertices++;
+    }
+
+    // Check bit 4 (original point p4, edge 7) using potentially flipped cube_idx
+    if (cube_idx & (1 << 4)) {
+        // Corresponds to points_edges[0][1] in C code
+        int edge_idx = 7; // Corresponds to points_edges[1][1] in C code
+        new_vertices_local[num_new_vertices * 3 + 0] =
+                (((double) iz) + d_vertList[edge_idx][0]) * spacing[0];
+        new_vertices_local[num_new_vertices * 3 + 1] =
+                (((double) iy) + d_vertList[edge_idx][1]) * spacing[1];
+        new_vertices_local[num_new_vertices * 3 + 2] =
+                (((double) ix) + d_vertList[edge_idx][2]) * spacing[2];
+        num_new_vertices++;
+    }
+
+    // Check bit 3 (original point p3, edge 11) using potentially flipped cube_idx
+    if (cube_idx & (1 << 3)) {
+        // Corresponds to points_edges[0][2] in C code
+        int edge_idx = 11; // Corresponds to points_edges[1][2] in C code
+        new_vertices_local[num_new_vertices * 3 + 0] =
+                (((double) iz) + d_vertList[edge_idx][0]) * spacing[0];
+        new_vertices_local[num_new_vertices * 3 + 1] =
+                (((double) iy) + d_vertList[edge_idx][1]) * spacing[1];
+        new_vertices_local[num_new_vertices * 3 + 2] =
+                (((double) ix) + d_vertList[edge_idx][2]) * spacing[2];
+        num_new_vertices++;
+    }
+
+    // Atomically reserve space and store vertices if any were found
+    if (num_new_vertices > 0) {
+        unsigned long long start_v_idx =
+                atomicAdd(vertex_count, (unsigned long long) num_new_vertices);
+        // Check for buffer overflow before writing
+        if (start_v_idx + num_new_vertices <= max_vertices) {
+            for (int v = 0; v < num_new_vertices; ++v) {
+                unsigned long long write_idx = start_v_idx + v;
+                vertices[write_idx * 3 + 0] = new_vertices_local[v * 3 + 0];
+                vertices[write_idx * 3 + 1] = new_vertices_local[v * 3 + 1];
+                vertices[write_idx * 3 + 2] = new_vertices_local[v * 3 + 2];
+            }
+        }
+        // If overflow occurs, the vertex_count will exceed max_vertices, handled in
+        // host code.
+    }
+
+    // --- Process Triangles for Surface Area and Volume ---
+    double local_SA = 0;
+    double local_Vol = 0;
+
+    int t = 0;
+    // Iterate through triangles defined in d_triTable for the current cube_idx
+    while (d_triTable[cube_idx][t * 3] >= 0) {
+        double p1[3], p2[3], p3[3]; // Triangle vertex coordinates
+        double v1[3], v2[3], cross[3]; // Vectors for calculations
+
+        // Get vertex indices from the table
+        int v_idx_1 = d_triTable[cube_idx][t * 3];
+        int v_idx_2 = d_triTable[cube_idx][t * 3 + 1];
+        int v_idx_3 = d_triTable[cube_idx][t * 3 + 2];
+
+        // Calculate absolute coordinates for each vertex
+        for (int d = 0; d < 3; ++d) {
+            p1[d] = (((double) (d == 0 ? iz : (d == 1 ? iy : ix))) +
+                     d_vertList[v_idx_1][d]) *
+                    spacing[d];
+            p2[d] = (((double) (d == 0 ? iz : (d == 1 ? iy : ix))) +
+                     d_vertList[v_idx_2][d]) *
+                    spacing[d];
+            p3[d] = (((double) (d == 0 ? iz : (d == 1 ? iy : ix))) +
+                     d_vertList[v_idx_3][d]) *
+                    spacing[d];
+        }
+
+        // Volume contribution: (p1 x p2) . p3 (adjust sign later)
+        cross[0] = (p1[1] * p2[2]) - (p2[1] * p1[2]);
+        cross[1] = (p1[2] * p2[0]) - (p2[2] * p1[0]);
+        cross[2] = (p1[0] * p2[1]) - (p2[0] * p1[1]);
+        local_Vol += cross[0] * p3[0] + cross[1] * p3[1] + cross[2] * p3[2];
+
+        // Surface Area contribution: 0.5 * |(p2-p1) x (p3-p1)|
+        for (int d = 0; d < 3; ++d) {
+            v1[d] = p2[d] - p1[d]; // Vector from p1 to p2
+            v2[d] = p3[d] - p1[d]; // Vector from p1 to p3
+        }
+
+        cross[0] = (v1[1] * v2[2]) - (v2[1] * v1[2]);
+        cross[1] = (v1[2] * v2[0]) - (v2[2] * v1[0]);
+        cross[2] = (v1[0] * v2[1]) - (v2[0] * v1[1]);
+
+        double mag_sq =
+                cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2];
+        local_SA += 0.5 * sqrt(mag_sq); // Add area of this triangle
+
+        t++; // Move to the next triangle for this cube
+    }
+
+    // Atomically add the calculated contributions for this cube to the global
+    // totals
+    atomicAdd(surfaceArea, local_SA);
+    atomicAdd(volume,
+              sign_correction * local_Vol); // Apply sign correction for volume
 }
 
-__global__ void calculate_meshDiameter_kernel(
+static __global__ void calculate_meshDiameter_kernel(
     const double
-        *vertices, // Input: Array of vertex coordinates (x, y, z, x, y, z, ...)
+    *vertices, // Input: Array of vertex coordinates (x, y, z, x, y, z, ...)
     size_t num_vertices, // Input: Total number of valid vertices in the array
     double *diameters_sq // Output: Array for squared max diameters [YZ, XZ, XY,
 ) {
-  // Calculate global thread index
-  int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    // Calculate global thread index
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-  // Bounds check: Ensure thread index is within the number of vertices
-  if (tid >= num_vertices) {
-    return;
-  }
-
-  // Get coordinates for the 'anchor' vertex 'a' assigned to this thread
-  double ax = vertices[tid * 3 + 0];
-  double ay = vertices[tid * 3 + 1];
-  double az = vertices[tid * 3 + 2];
-
-  // Compare vertex 'a' with all subsequent vertices 'b' to avoid redundant
-  // calculations
-  for (size_t j = tid + 1; j < num_vertices; ++j) {
-    // Get coordinates for vertex 'b'
-    double bx = vertices[j * 3 + 0];
-    double by = vertices[j * 3 + 1];
-    double bz = vertices[j * 3 + 2];
-
-    // Calculate squared differences in coordinates
-    double dx = ax - bx;
-    double dy = ay - by;
-    double dz = az - bz;
-
-    // Calculate squared Euclidean distance
-    double dist_sq = dx * dx + dy * dy + dz * dz;
-
-    // Atomically update the overall maximum squared diameter
-    atomicMax(&diameters_sq[3], dist_sq);
-
-    // Atomically update plane-specific maximum squared diameters based on
-    // coordinate equality Note: Direct float comparison `==` is used here,
-    // matching the original C logic. This might be sensitive to precision
-    // issues.
-    if (ax == bx) {
-      // If x-coordinates are equal (lies in a YZ plane)
-      atomicMax(&diameters_sq[0], dist_sq);
+    // Bounds check: Ensure thread index is within the number of vertices
+    if (tid >= num_vertices) {
+        return;
     }
-    if (ay == by) {
-      // If y-coordinates are equal (lies in an XZ plane)
-      atomicMax(&diameters_sq[1], dist_sq);
+
+    // Get coordinates for the 'anchor' vertex 'a' assigned to this thread
+    double ax = vertices[tid * 3 + 0];
+    double ay = vertices[tid * 3 + 1];
+    double az = vertices[tid * 3 + 2];
+
+    // Compare vertex 'a' with all subsequent vertices 'b' to avoid redundant
+    // calculations
+    for (size_t j = tid + 1; j < num_vertices; ++j) {
+        // Get coordinates for vertex 'b'
+        double bx = vertices[j * 3 + 0];
+        double by = vertices[j * 3 + 1];
+        double bz = vertices[j * 3 + 2];
+
+        // Calculate squared differences in coordinates
+        double dx = ax - bx;
+        double dy = ay - by;
+        double dz = az - bz;
+
+        // Calculate squared Euclidean distance
+        double dist_sq = dx * dx + dy * dy + dz * dz;
+
+        // Atomically update the overall maximum squared diameter
+        atomicMax(&diameters_sq[3], dist_sq);
+
+        // Atomically update plane-specific maximum squared diameters based on
+        // coordinate equality Note: Direct float comparison `==` is used here,
+        // matching the original C logic. This might be sensitive to precision
+        // issues.
+        if (ax == bx) {
+            // If x-coordinates are equal (lies in a YZ plane)
+            atomicMax(&diameters_sq[0], dist_sq);
+        }
+        if (ay == by) {
+            // If y-coordinates are equal (lies in an XZ plane)
+            atomicMax(&diameters_sq[1], dist_sq);
+        }
+        if (az == bz) {
+            // If z-coordinates are equal (lies in an XY plane)
+            atomicMax(&diameters_sq[2], dist_sq);
+        }
     }
-    if (az == bz) {
-      // If z-coordinates are equal (lies in an XY plane)
-      atomicMax(&diameters_sq[2], dist_sq);
-    }
-  }
 }
 
 // ------------------------------
@@ -377,197 +380,197 @@ __global__ void calculate_meshDiameter_kernel(
 // ------------------------------
 
 SOLUTION_DECL(0) {
-  cudaError_t cudaStatus = cudaSuccess;
+    cudaError_t cudaStatus = cudaSuccess;
 
-  // --- Device Memory Pointers ---
-  char *mask_dev = NULL;
-  int *size_dev = NULL;
-  int *strides_dev = NULL;
-  double *spacing_dev = NULL;
-  double *surfaceArea_dev = NULL;
-  double *volume_dev = NULL;
-  double *vertices_dev = NULL;
-  unsigned long long *vertex_count_dev = NULL;
-  double *diameters_sq_dev = NULL;
+    // --- Device Memory Pointers ---
+    char *mask_dev = NULL;
+    int *size_dev = NULL;
+    int *strides_dev = NULL;
+    double *spacing_dev = NULL;
+    double *surfaceArea_dev = NULL;
+    double *volume_dev = NULL;
+    double *vertices_dev = NULL;
+    unsigned long long *vertex_count_dev = NULL;
+    double *diameters_sq_dev = NULL;
 
-  // --- Host-side Accumulators/Temporaries ---
-  double surfaceArea_host = 0.0;
-  double volume_host = 0.0;
-  unsigned long long vertex_count_host = 0;
-  double diameters_sq_host[4] = {0.0, 0.0, 0.0, 0.0};
+    // --- Host-side Accumulators/Temporaries ---
+    double surfaceArea_host = 0.0;
+    double volume_host = 0.0;
+    unsigned long long vertex_count_host = 0;
+    double diameters_sq_host[4] = {0.0, 0.0, 0.0, 0.0};
 
-  // --- Recalculate Host Strides (Assuming C-contiguous char mask) ---
-  int calculated_strides_host[3];
-  calculated_strides_host[2] =
-      sizeof(char); // Stride for the last dimension (ix)
-  calculated_strides_host[1] =
-      size[2] *
-      calculated_strides_host[2]; // Stride for the middle dimension (iy)
-  calculated_strides_host[0] =
-      size[1] *
-      calculated_strides_host[1]; // Stride for the first dimension (iz)
-  // --- End Recalculation ---
+    // --- Recalculate Host Strides (Assuming C-contiguous char mask) ---
+    int calculated_strides_host[3];
+    calculated_strides_host[2] =
+            sizeof(char); // Stride for the last dimension (ix)
+    calculated_strides_host[1] =
+            size[2] *
+            calculated_strides_host[2]; // Stride for the middle dimension (iy)
+    calculated_strides_host[0] =
+            size[1] *
+            calculated_strides_host[1]; // Stride for the first dimension (iz)
+    // --- End Recalculation ---
 
-  // --- Determine Allocation Sizes ---
-  size_t mask_elements = (size_t)size[0] * size[1] * size[2];
-  size_t mask_size_bytes = mask_elements * sizeof(char);
-  size_t num_cubes = (size_t)(size[0] - 1) * (size[1] - 1) * (size[2] - 1);
-  size_t max_possible_vertices = num_cubes * 3;
-  if (max_possible_vertices == 0)
-    max_possible_vertices = 1;
-  size_t vertices_bytes = max_possible_vertices * 3 * sizeof(double);
+    // --- Determine Allocation Sizes ---
+    size_t mask_elements = (size_t) size[0] * size[1] * size[2];
+    size_t mask_size_bytes = mask_elements * sizeof(char);
+    size_t num_cubes = (size_t) (size[0] - 1) * (size[1] - 1) * (size[2] - 1);
+    size_t max_possible_vertices = num_cubes * 3;
+    if (max_possible_vertices == 0)
+        max_possible_vertices = 1;
+    size_t vertices_bytes = max_possible_vertices * 3 * sizeof(double);
 
-  // --- 1. Allocate GPU Memory ---
-  cudaStatus = cudaMalloc((void **)&mask_dev, mask_size_bytes);
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus = cudaMalloc((void **)&size_dev, 3 * sizeof(int));
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus = cudaMalloc((void **)&strides_dev, 3 * sizeof(int));
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus = cudaMalloc((void **)&spacing_dev, 3 * sizeof(double));
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus = cudaMalloc((void **)&surfaceArea_dev, sizeof(double));
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus = cudaMalloc((void **)&volume_dev, sizeof(double));
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus =
-      cudaMalloc((void **)&vertex_count_dev, sizeof(unsigned long long));
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus = cudaMalloc((void **)&diameters_sq_dev, 4 * sizeof(double));
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus = cudaMalloc((void **)&vertices_dev, vertices_bytes);
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-
-  // --- 2. Initialize Device Memory (Scalars to 0) ---
-  cudaStatus = cudaMemset(surfaceArea_dev, 0, sizeof(double));
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus = cudaMemset(volume_dev, 0, sizeof(double));
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus = cudaMemset(vertex_count_dev, 0, sizeof(unsigned long long));
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus = cudaMemset(diameters_sq_dev, 0, 4 * sizeof(double));
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-
-  // --- 3. Copy Input Data from Host to Device ---
-  cudaStatus =
-      cudaMemcpy(mask_dev, mask, mask_size_bytes, cudaMemcpyHostToDevice);
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus =
-      cudaMemcpy(size_dev, size, 3 * sizeof(int), cudaMemcpyHostToDevice);
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus = cudaMemcpy(strides_dev, calculated_strides_host, 3 * sizeof(int),
-                          cudaMemcpyHostToDevice);
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus = cudaMemcpy(spacing_dev, spacing, 3 * sizeof(double),
-                          cudaMemcpyHostToDevice);
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-
-  // --- 4. Launch Marching Cubes Kernel ---
-  if (num_cubes > 0) {
-    dim3 blockSize(8, 8, 8);
-    dim3 gridSize((size[2] - 1 + blockSize.x - 1) / blockSize.x,
-                  (size[1] - 1 + blockSize.y - 1) / blockSize.y,
-                  (size[0] - 1 + blockSize.z - 1) / blockSize.z);
-
-    calculate_coefficients_kernel<<<gridSize, blockSize>>>(
-        mask_dev, size_dev, strides_dev, spacing_dev, surfaceArea_dev,
-        volume_dev, vertices_dev, vertex_count_dev, max_possible_vertices);
-
-    cudaStatus = cudaGetLastError();
+    // --- 1. Allocate GPU Memory ---
+    cudaStatus = cudaMalloc((void **) &mask_dev, mask_size_bytes);
     if (cudaStatus != cudaSuccess)
-      goto cleanup;
-  }
-
-  // --- 5. Copy Results (SA, Volume, vertex count) back to Host ---
-  cudaStatus = cudaMemcpy(&surfaceArea_host, surfaceArea_dev, sizeof(double),
-                          cudaMemcpyDeviceToHost);
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus = cudaMemcpy(&volume_host, volume_dev, sizeof(double),
-                          cudaMemcpyDeviceToHost);
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-  cudaStatus = cudaMemcpy(&vertex_count_host, vertex_count_dev,
-                          sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-  if (cudaStatus != cudaSuccess)
-    goto cleanup;
-
-  // Final adjustments and storing results
-  *volume = volume_host / 6.0;
-  *surfaceArea = surfaceArea_host;
-
-  // Check if vertex buffer might have overflowed
-  if (vertex_count_host > max_possible_vertices) {
-    fprintf(stderr,
-            "Warning: CUDA vertex buffer potentially overflowed (3D). Needed: "
-            "%llu, Allocated: %llu. Diameter results might be based on "
-            "incomplete data.\n",
-            vertex_count_host, (unsigned long long)max_possible_vertices);
-    vertex_count_host = max_possible_vertices;
-  }
-
-  // --- 6. Launch Diameter Kernel (only if vertices were generated) ---
-  if (vertex_count_host > 0) {
-    size_t num_vertices_actual = (size_t)vertex_count_host;
-    int threadsPerBlock_diam = 256;
-    int numBlocks_diam =
-        (num_vertices_actual + threadsPerBlock_diam - 1) / threadsPerBlock_diam;
-
-    calculate_meshDiameter_kernel<<<numBlocks_diam, threadsPerBlock_diam>>>(
-        vertices_dev, num_vertices_actual, diameters_sq_dev);
-
-    cudaStatus = cudaGetLastError();
+        goto cleanup;
+    cudaStatus = cudaMalloc((void **) &size_dev, 3 * sizeof(int));
     if (cudaStatus != cudaSuccess)
-      goto cleanup;
-
-    cudaStatus = cudaMemcpy(diameters_sq_host, diameters_sq_dev,
-                            4 * sizeof(double), cudaMemcpyDeviceToHost);
+        goto cleanup;
+    cudaStatus = cudaMalloc((void **) &strides_dev, 3 * sizeof(int));
     if (cudaStatus != cudaSuccess)
-      goto cleanup;
+        goto cleanup;
+    cudaStatus = cudaMalloc((void **) &spacing_dev, 3 * sizeof(double));
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+    cudaStatus = cudaMalloc((void **) &surfaceArea_dev, sizeof(double));
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+    cudaStatus = cudaMalloc((void **) &volume_dev, sizeof(double));
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+    cudaStatus =
+            cudaMalloc((void **) &vertex_count_dev, sizeof(unsigned long long));
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+    cudaStatus = cudaMalloc((void **) &diameters_sq_dev, 4 * sizeof(double));
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+    cudaStatus = cudaMalloc((void **) &vertices_dev, vertices_bytes);
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
 
-    diameters[0] = sqrt(diameters_sq_host[0]);
-    diameters[1] = sqrt(diameters_sq_host[1]);
-    diameters[2] = sqrt(diameters_sq_host[2]);
-    diameters[3] = sqrt(diameters_sq_host[3]);
-  } else {
-    diameters[0] = 0.0;
-    diameters[1] = 0.0;
-    diameters[2] = 0.0;
-    diameters[3] = 0.0;
-  }
+    // --- 2. Initialize Device Memory (Scalars to 0) ---
+    cudaStatus = cudaMemset(surfaceArea_dev, 0, sizeof(double));
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+    cudaStatus = cudaMemset(volume_dev, 0, sizeof(double));
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+    cudaStatus = cudaMemset(vertex_count_dev, 0, sizeof(unsigned long long));
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+    cudaStatus = cudaMemset(diameters_sq_dev, 0, 4 * sizeof(double));
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
 
-  // --- 7. Cleanup: Free GPU memory ---
+    // --- 3. Copy Input Data from Host to Device ---
+    cudaStatus =
+            cudaMemcpy(mask_dev, mask, mask_size_bytes, cudaMemcpyHostToDevice);
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+    cudaStatus =
+            cudaMemcpy(size_dev, size, 3 * sizeof(int), cudaMemcpyHostToDevice);
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+    cudaStatus = cudaMemcpy(strides_dev, calculated_strides_host, 3 * sizeof(int),
+                            cudaMemcpyHostToDevice);
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+    cudaStatus = cudaMemcpy(spacing_dev, spacing, 3 * sizeof(double),
+                            cudaMemcpyHostToDevice);
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+
+    // --- 4. Launch Marching Cubes Kernel ---
+    if (num_cubes > 0) {
+        dim3 blockSize(8, 8, 8);
+        dim3 gridSize((size[2] - 1 + blockSize.x - 1) / blockSize.x,
+                      (size[1] - 1 + blockSize.y - 1) / blockSize.y,
+                      (size[0] - 1 + blockSize.z - 1) / blockSize.z);
+
+        calculate_coefficients_kernel<<<gridSize, blockSize>>>(
+            mask_dev, size_dev, strides_dev, spacing_dev, surfaceArea_dev,
+            volume_dev, vertices_dev, vertex_count_dev, max_possible_vertices);
+
+        cudaStatus = cudaGetLastError();
+        if (cudaStatus != cudaSuccess)
+            goto cleanup;
+    }
+
+    // --- 5. Copy Results (SA, Volume, vertex count) back to Host ---
+    cudaStatus = cudaMemcpy(&surfaceArea_host, surfaceArea_dev, sizeof(double),
+                            cudaMemcpyDeviceToHost);
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+    cudaStatus = cudaMemcpy(&volume_host, volume_dev, sizeof(double),
+                            cudaMemcpyDeviceToHost);
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+    cudaStatus = cudaMemcpy(&vertex_count_host, vertex_count_dev,
+                            sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    if (cudaStatus != cudaSuccess)
+        goto cleanup;
+
+    // Final adjustments and storing results
+    *volume = volume_host / 6.0;
+    *surfaceArea = surfaceArea_host;
+
+    // Check if vertex buffer might have overflowed
+    if (vertex_count_host > max_possible_vertices) {
+        fprintf(stderr,
+                "Warning: CUDA vertex buffer potentially overflowed (3D). Needed: "
+                "%llu, Allocated: %llu. Diameter results might be based on "
+                "incomplete data.\n",
+                vertex_count_host, (unsigned long long) max_possible_vertices);
+        vertex_count_host = max_possible_vertices;
+    }
+
+    // --- 6. Launch Diameter Kernel (only if vertices were generated) ---
+    if (vertex_count_host > 0) {
+        size_t num_vertices_actual = (size_t) vertex_count_host;
+        int threadsPerBlock_diam = 256;
+        int numBlocks_diam =
+                (num_vertices_actual + threadsPerBlock_diam - 1) / threadsPerBlock_diam;
+
+        calculate_meshDiameter_kernel<<<numBlocks_diam, threadsPerBlock_diam>>>(
+            vertices_dev, num_vertices_actual, diameters_sq_dev);
+
+        cudaStatus = cudaGetLastError();
+        if (cudaStatus != cudaSuccess)
+            goto cleanup;
+
+        cudaStatus = cudaMemcpy(diameters_sq_host, diameters_sq_dev,
+                                4 * sizeof(double), cudaMemcpyDeviceToHost);
+        if (cudaStatus != cudaSuccess)
+            goto cleanup;
+
+        diameters[0] = sqrt(diameters_sq_host[0]);
+        diameters[1] = sqrt(diameters_sq_host[1]);
+        diameters[2] = sqrt(diameters_sq_host[2]);
+        diameters[3] = sqrt(diameters_sq_host[3]);
+    } else {
+        diameters[0] = 0.0;
+        diameters[1] = 0.0;
+        diameters[2] = 0.0;
+        diameters[3] = 0.0;
+    }
+
+    // --- 7. Cleanup: Free GPU memory ---
 cleanup:
-  cudaFree(mask_dev);
-  cudaFree(size_dev);
-  cudaFree(strides_dev);
-  cudaFree(spacing_dev);
-  cudaFree(surfaceArea_dev);
-  cudaFree(volume_dev);
-  cudaFree(vertices_dev);
-  cudaFree(vertex_count_dev);
-  cudaFree(diameters_sq_dev);
+    cudaFree(mask_dev);
+    cudaFree(size_dev);
+    cudaFree(strides_dev);
+    cudaFree(spacing_dev);
+    cudaFree(surfaceArea_dev);
+    cudaFree(volume_dev);
+    cudaFree(vertices_dev);
+    cudaFree(vertex_count_dev);
+    cudaFree(diameters_sq_dev);
 
-  if (cudaStatus != cudaSuccess) {
-    fprintf(stderr, "CUDA Error occurred: %s\n",
-            cudaGetErrorString(cudaStatus));
-  }
-  return cudaStatus;
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "CUDA Error occurred: %s\n",
+                cudaGetErrorString(cudaStatus));
+    }
+    return cudaStatus;
 }

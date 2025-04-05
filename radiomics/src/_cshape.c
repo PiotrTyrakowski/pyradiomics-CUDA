@@ -5,6 +5,13 @@
 #include <numpy/arrayobject.h>
 #include "cshape.h"
 
+#ifdef CUDA_EXTENSIONS_ENABLED
+#include "cuda/cshape.cuh"
+#define CALCULATE_COEFFICIENTS_FUNC cuda_calculate_coefficients
+#else
+#define CALCULATE_COEFFICIENTS_FUNC calculate_coefficients
+#endif
+
 static char module_docstring[] = "This module links to C-compiled code for efficient calculation of the surface area "
                                  "in the pyRadiomics package. It provides fast calculation using a marching cubes "
                                  "algortihm, accessed via ""calculate_surfacearea"". Arguments for this function"
@@ -114,7 +121,7 @@ static PyObject *cshape_calculate_coefficients(PyObject *self, PyObject *args)
   spacing = (double *)PyArray_DATA(spacing_arr);
 
   //Calculate Surface Area and volume
-  if (calculate_coefficients(mask, size, strides, spacing, &SA, &Volume, diameters))
+  if (CALCULATE_COEFFICIENTS_FUNC(mask, size, strides, spacing, &SA, &Volume, diameters))
   {
     // An error has occurred
     Py_XDECREF(mask_arr);
