@@ -21,26 +21,21 @@ import versioneer
 def find_nvcc():
   nvcc_path = shutil.which('nvcc')
   if nvcc_path:
-    print(f"Found nvcc at: {nvcc_path}")
     return nvcc_path
 
   cuda_home = os.environ.get('CUDA_HOME') or os.environ.get('CUDA_PATH')
   if cuda_home:
-    print(f"CUDA_HOME/CUDA_PATH found at: {cuda_home}")
 
     for bindir in ['bin', 'bin64']:
       potential_path = os.path.join(cuda_home, bindir, 'nvcc')
 
       if os.path.exists(potential_path):
-        print(f"Found nvcc via CUDA_HOME/PATH ({bindir}): {potential_path}")
         return potential_path
 
       potential_path += '.exe'
       if os.path.exists(potential_path):
-        print(f"Found nvcc.exe via CUDA_HOME/PATH ({bindir}): {potential_path}")
         return potential_path
 
-  print("WARNING: nvcc command not found in PATH or via CUDA_HOME/CUDA_PATH.", file=sys.stderr)
   return None
 
 
@@ -77,7 +72,6 @@ class CudaBuildExt(_build_ext):
           other_sources.append(source)
 
       if cuda_sources:
-        print(f"Pre-compiling CUDA sources for extension {ext.name}...")
         ext_build_dir = os.path.join(self.build_temp, ext.name)
         if not os.path.exists(ext_build_dir):
           os.makedirs(ext_build_dir)
@@ -107,7 +101,6 @@ class CudaBuildExt(_build_ext):
           # Add flags collected earlier
           cmd.extend(nvcc_compile_args)
 
-          print(f"Running nvcc command: {' '.join(cmd)}")
           try:
             result = subprocess.run(cmd, check=True, text=True, stderr=subprocess.PIPE,
                                     stdout=subprocess.PIPE)
@@ -137,7 +130,6 @@ class CudaBuildExt(_build_ext):
         ext.extra_compile_args = ext.extra_compile_args.get('c++', []) if \
           isinstance(ext.extra_compile_args, dict) else ext.extra_compile_args
 
-    print("Proceeding with standard build process for remaining sources and linking...")
     _build_ext.build_extensions(self)
 
 
@@ -168,7 +160,6 @@ def get_cuda_extension():
     for lib_path in potential_lib_paths:
       if os.path.isdir(lib_path):
         found_lib_dir = lib_path
-        print(f"Found CUDA library directory based on nvcc path: {found_lib_dir}")
         break
 
     if found_lib_dir:
@@ -191,7 +182,6 @@ def get_cuda_extension():
         for lib_path_env in potential_lib_paths_env:
           if os.path.isdir(lib_path_env):
             found_lib_dir_env = lib_path_env
-            print(f"Using CUDA library directory from CUDA_HOME/PATH: {found_lib_dir_env}")
             break
 
         if found_lib_dir_env:
@@ -210,10 +200,7 @@ def get_cuda_extension():
   nvcc_flags_env = os.environ.get('NVCC_FLAGS', '')
   nvcc_extra_args = nvcc_flags_env.split()
 
-  if nvcc_extra_args:
-    print(f"Using NVCC_FLAGS from environment: {nvcc_flags_env}")
-  else:
-    print("NVCC_FLAGS environment variable not set or empty. Using default nvcc options.")
+  if not nvcc_extra_args:
     nvcc_extra_args = ['-O3']
 
   cuda_src_dir = os.path.join('radiomics', 'src', 'cuda')
