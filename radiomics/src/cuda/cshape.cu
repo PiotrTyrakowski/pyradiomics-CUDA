@@ -7,7 +7,7 @@
 /* Pick the best solution here */
 SOLUTION_DECL(0);
 
-int cuda_calculate_coefficients(char *mask, int *size, int *strides, double *spacing,
+EXTERN int cuda_calculate_coefficients(char *mask, int *size, int *strides, double *spacing,
                            double *surfaceArea, double *volume, double *diameters) {
 
     printf("CUDA code called\n");

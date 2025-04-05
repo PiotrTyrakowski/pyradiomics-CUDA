@@ -97,6 +97,7 @@ class CudaBuildExt(_build_ext):
           cmd.extend(nvcc_compile_args)
 
           try:
+            print(f"Compiling {cuda_src} with nvcc: {' '.join(cmd)}")
             result = subprocess.run(cmd, check=True, text=True, stderr=subprocess.PIPE,
                                     stdout=subprocess.PIPE)
 
