@@ -1,5 +1,5 @@
 #include "test.cuh"
-#include <stdlib.h>
+#include <stdio.h>
 
 /* This file stands as interface to the CUDA code from pyradiomics library */
 
@@ -8,6 +8,8 @@ SOLUTION_DECL(0);
 
 int cuda_calculate_coefficients(char *mask, int *size, int *strides, double *spacing,
                            double *surfaceArea, double *volume, double *diameters) {
+
+    printf("CUDA code called\n");
     return SOLUTION_NAME(0)(
         mask,
         size,
