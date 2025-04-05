@@ -55,12 +55,6 @@ class CudaBuildExt(_build_ext):
         raise RuntimeError("nvcc compiler not found, cannot build CUDA extensions.")
 
     for ext in self.extensions:
-
-      if has_cuda_ext:
-        if not hasattr(ext, 'define_macros') or ext.define_macros is None:
-          ext.define_macros = []
-        ext.define_macros.append(('CUDA_EXTENSIONS_ENABLED', '1'))
-
       cuda_sources = []
       other_sources = []
 
@@ -104,8 +98,6 @@ class CudaBuildExt(_build_ext):
           try:
             result = subprocess.run(cmd, check=True, text=True, stderr=subprocess.PIPE,
                                     stdout=subprocess.PIPE)
-            if result.stderr:
-              print(f"nvcc stderr:\n{result.stderr}", file=sys.stderr)
 
           except subprocess.CalledProcessError as e:
             print(f"ERROR: nvcc compilation failed for {cuda_src}:\n{e.stderr}", file=sys.stderr)
@@ -124,24 +116,21 @@ class CudaBuildExt(_build_ext):
         # Add the compiled .o files to be linked
         ext.extra_objects = objects
 
-        # Ensure the C++ linker is used if CUDA was involved
-        ext.language = ext.language or 'c++'
-
-        ext.extra_compile_args = ext.extra_compile_args.get('c++', []) if \
+        ext.extra_compile_args = ext.extra_compile_args.get('C', []) if \
           isinstance(ext.extra_compile_args, dict) else ext.extra_compile_args
 
     _build_ext.build_extensions(self)
 
 
-def get_cuda_extension():
+def attach_cuda_if_possible(extension, cuda_sources):
   if os.environ.get('DISABLE_CUDA_EXTENSIONS', '0') == '1':
     print("DISABLE_CUDA_EXTENSIONS=1: skipping CUDA extension build")
-    return []
+    return extension
 
   nvcc = find_nvcc()
   if not nvcc:
     print("CUDA not found. Skipping CUDA extension build.")
-    return []
+    return extension
 
   # --- Determine CUDA Library Directory ---
   nvcc_path_for_libs = nvcc
@@ -203,26 +192,18 @@ def get_cuda_extension():
   if not nvcc_extra_args:
     nvcc_extra_args = ['-O3']
 
-  cuda_src_dir = os.path.join('radiomics', 'src', 'cuda')
+  cuda_include_dir = os.path.join('radiomics', 'src', 'cuda')
+  extension.sources += cuda_sources
+  extension.include_dirs += [cuda_include_dir]
+  extension.libraries += ['cudart']
+  extension.library_dirs += cuda_library_dirs
+  extension.extra_compile_args = {
+    'nvcc': nvcc_extra_args,
+    'C': extension.extra_compile_args
+  }
+  extension.define_macros += [('CUDA_EXTENSIONS_ENABLED', '1')]
 
-  cuda_shape_ext = Extension(
-    "radiomics.cuda",
-    sources=[
-              os.path.join(cuda_src_dir, "cshape.cu"),
-            ] + [
-              os.path.join(cuda_src_dir, "implementations", f) for f in os.listdir(
-        os.path.join(cuda_src_dir, "implementations"))
-            ],
-
-    include_dirs=[cuda_src_dir],
-    libraries=['cudart'],
-    library_dirs=cuda_library_dirs,
-    language='c++',
-    extra_compile_args={'nvcc': nvcc_extra_args},
-    define_macros=[('CUDA_EXTENSIONS_ENABLED', '1')]
-  )
-
-  return [cuda_shape_ext]
+  return extension
 
 # ------------------------------
 # Actual configuration
@@ -235,13 +216,18 @@ commands = versioneer.get_cmdclass()
 commands['build_ext'] = CudaBuildExt
 incDirs = [sysconfig.get_python_inc(), numpy.get_include()]
 
-ext = [Extension("radiomics._cmatrices", ["radiomics/src/_cmatrices.c", "radiomics/src/cmatrices.c"],
+cuda_src_dir = os.path.join('radiomics', 'src', 'cuda')
+ext = [
+  Extension("radiomics._cmatrices", ["radiomics/src/_cmatrices.c", "radiomics/src/cmatrices.c"],
                  include_dirs=incDirs),
-       Extension("radiomics._cshape", ["radiomics/src/_cshape.c", "radiomics/src/cshape.c"],
-                 include_dirs=incDirs)]
-
-# May be empty if no CUDA is available or is disabled
-cuda_ext = get_cuda_extension()
+  attach_cuda_if_possible(
+    extension=Extension("radiomics._cshape", ["radiomics/src/_cshape.c", "radiomics/src/cshape.c"],
+                        include_dirs=incDirs),
+    cuda_sources=[os.path.join(cuda_src_dir, "cshape.cu"), ] + [
+      os.path.join(cuda_src_dir, "implementations", f) for f in os.listdir(
+        os.path.join(cuda_src_dir, "implementations"))
+    ]
+  )]
 
 setup(
   name='pyradiomics',
@@ -250,6 +236,6 @@ setup(
   cmdclass=commands,
 
   packages=['radiomics', 'radiomics.scripts'],
-  ext_modules=ext + cuda_ext,
+  ext_modules=ext,
   zip_safe=False
 )

@@ -1,4 +1,5 @@
 #include "test.cuh"
+#include "cshape.cuh"
 #include <stdio.h>
 
 /* This file stands as interface to the CUDA code from pyradiomics library */
