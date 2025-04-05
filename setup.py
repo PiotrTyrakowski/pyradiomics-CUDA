@@ -1,18 +1,19 @@
 #!/usr/bin/env python
 
+import os
+import platform
+import shutil
+import subprocess
 import sys
 from distutils import sysconfig
 from distutils.errors import CompileError
 
 import numpy
-import os
-import platform
-import shutil
-import subprocess
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext as _build_ext
 
 import versioneer
+
 
 # -------------------------------
 # Cuda setuptools extension
@@ -216,18 +217,18 @@ commands = versioneer.get_cmdclass()
 commands['build_ext'] = CudaBuildExt
 incDirs = [sysconfig.get_python_inc(), numpy.get_include()]
 
-cuda_src_dir = os.path.join('radiomics', 'src', 'cuda')
 ext = [
   Extension("radiomics._cmatrices", ["radiomics/src/_cmatrices.c", "radiomics/src/cmatrices.c"],
                  include_dirs=incDirs),
   attach_cuda_if_possible(
     extension=Extension("radiomics._cshape", ["radiomics/src/_cshape.c", "radiomics/src/cshape.c"],
                         include_dirs=incDirs),
-    cuda_sources=[os.path.join(cuda_src_dir, "cshape.cu"), ] + [
-      os.path.join(cuda_src_dir, "implementations", f) for f in os.listdir(
-        os.path.join(cuda_src_dir, "implementations"))
+    cuda_sources=["radiomics/src/cuda/cshape.cu"] + [
+      os.path.join("radiomics/src/cuda/implementations", f)
+      for f in os.listdir("radiomics/src/cuda/implementations")
     ]
-  )]
+  )
+]
 
 setup(
   name='pyradiomics',
