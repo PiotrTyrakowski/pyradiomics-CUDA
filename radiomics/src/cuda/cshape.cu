@@ -10,7 +10,6 @@ SOLUTION_DECL(0);
 EXTERN int cuda_calculate_coefficients(char *mask, int *size, int *strides, double *spacing,
                            double *surfaceArea, double *volume, double *diameters) {
 
-    printf("CUDA code called\n");
     return SOLUTION_NAME(0)(
         mask,
         size,

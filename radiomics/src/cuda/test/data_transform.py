@@ -158,7 +158,7 @@ DEFAULT_CONFIG="""
 }
 """
 
-def write_shape_class(mask_path, scan_path, label_mapping, base_dir = None, config_path = None):
+def write_shape_class(mask_path, scan_path, max_idx, base_dir = None, config_path = None):
   extractor = RadiomicsFeatureWriter(base_dir)
 
   if config_path is None:
@@ -168,8 +168,24 @@ def write_shape_class(mask_path, scan_path, label_mapping, base_dir = None, conf
 
   extractor.loadParams(config_path)
 
-  features = {}
-  for val, name in label_mapping.items():
-    features[name] = extractor.save_npy_files(scan_path, mask_path, val)
+  for val in range(1, max_idx + 1):
+    extractor.save_npy_files(scan_path, mask_path, val)
 
   return extractor.get_saved_dirs()
+
+if __name__ == "__main__":
+  import sys
+
+  if len(sys.argv) != 4 and len(sys.argv) != 5:
+    print("Usage: python data_transform.py <mask_path> <scan_path> <max_idx>")
+    sys.exit(1)
+
+  mask_path = sys.argv[1]
+  scan_path = sys.argv[2]
+  max_idx = int(sys.argv[3])
+  base_dir = sys.argv[4] if len(sys.argv) == 5 else None
+
+  if base_dir is not None:
+    os.makedirs(base_dir, exist_ok=True)
+
+  write_shape_class(mask_path, scan_path, max_idx, base_dir)
