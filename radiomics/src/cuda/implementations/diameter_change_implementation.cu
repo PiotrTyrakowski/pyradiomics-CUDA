@@ -6,7 +6,7 @@
 // ------------------------------
 
 #include "shape/basic_implementation.cuh"
-#include "volumetry/improved_implementation.cuh"
+#include "volumetry/improved_atomic_implementation.cuh"
 
 // ------------------------------
 // Host wrapper
