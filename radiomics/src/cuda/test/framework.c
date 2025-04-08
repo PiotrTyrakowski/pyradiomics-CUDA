@@ -296,6 +296,9 @@ static void RunTest_(const char *input) {
 
         TRACE_INFO("Found solution with idx: %lu", idx);
         RunTestOnFunc_(data, idx);
+
+        /* Ensure this run is not affecting the next one */
+        CleanGPUCache();
     }
 
     CleanupData(data);

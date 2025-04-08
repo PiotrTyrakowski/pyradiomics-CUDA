@@ -7,10 +7,12 @@
 #define EXTERN
 #endif // __cplusplus
 
-#include <cuda_runtime.h>
-
 EXTERN int AsyncInitStreamIfNeeded();
-EXTERN cudaStream_t* GetAsyncStream();
 EXTERN int AsyncDestroyStreamIfNeeded();
+
+#ifdef CUDART_VERSION
+#include <cuda_runtime.h>
+EXTERN cudaStream_t* GetAsyncStream();
+#endif // CUDART_VERSION
 
 #endif //ASYNC_STREAM_CUH
