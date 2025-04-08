@@ -1,6 +1,7 @@
 #ifndef BASIC_LAUNCHER_CUH
 #define BASIC_LAUNCHER_CUH
 #include <stdio.h>
+#include "launcher.cuh"
 
 template<class MainKernel, class DiameterKernel>
 int basic_cuda_launcher(
@@ -226,52 +227,6 @@ cleanup:
 }
 
 #define CUDA_BASIC_LAUNCH_SOLUTION(main_kernel, diam_kernel) \
-    basic_cuda_launcher( \
-        []( \
-            dim3 gridSize, \
-            dim3 blockSize, \
-            const char *mask, \
-            const int *size, \
-            const int *strides, \
-            const double *spacing, \
-            double *surfaceArea, \
-            double *volume, \
-            double *vertices, \
-            unsigned long long *vertex_count, \
-            size_t max_vertices \
-        ) { \
-            return main_kernel<<<gridSize, blockSize>>>( \
-                mask, \
-                size, \
-                strides, \
-                spacing, \
-                surfaceArea, \
-                volume, \
-                vertices, \
-                vertex_count, \
-                max_vertices \
-            ); \
-        }, \
-        []( \
-            int numBlocks_diam, \
-            int threadsPerBlock_diam, \
-            const double *vertices, \
-            size_t num_vertices, \
-            double *diameters_sq \
-        ) { \
-            return diam_kernel<<<numBlocks_diam, threadsPerBlock_diam>>>( \
-                vertices, \
-                num_vertices, \
-                diameters_sq \
-            ); \
-        }, \
-        mask, \
-        size, \
-        strides, \
-        spacing, \
-        surfaceArea, \
-        volume, \
-        diameters \
-    )
+    CUDA_LAUNCH_SOLUTION(basic_cuda_launcher, main_kernel, diam_kernel)
 
 #endif //BASIC_LAUNCHER_CUH
