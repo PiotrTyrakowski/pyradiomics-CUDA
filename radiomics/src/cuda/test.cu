@@ -23,6 +23,46 @@ int AddShapeFunction(size_t idx, shape_func_t func) {
     return (int) idx;
 }
 
+__global__ void polluteCaches(float *buffer, size_t bufferSize) {
+    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    const int stride = blockDim.x * gridDim.x;
+
+    const int prime1 = 31;
+    const int prime2 = 67;
+
+    float sum = 0.0f;
+    for (size_t i = tid; i < bufferSize; i += stride) {
+        size_t idx1 = (i * prime1) % bufferSize;
+        size_t idx2 = (i * prime2) % bufferSize;
+
+        // Read-modify-write to ensure memory operations aren't optimized away
+        sum += buffer[idx1];
+        buffer[idx2] = sum;
+
+        size_t idx3 = (bufferSize - 1 - i) % bufferSize;
+        sum += buffer[idx3];
+    }
+
+    if (sum == 0.0f) {
+        buffer[tid % bufferSize] = sum;
+    }
+}
+
+void CleanGPUCache() {
+    size_t bufferSize = 256 * 1024 * 1024 / sizeof(float);
+    float *d_buffer;
+    cudaMalloc(&d_buffer, bufferSize * sizeof(float));
+
+    cudaMemset(d_buffer, 0, bufferSize * sizeof(float));
+
+    int blockSize = 256;
+    int gridSize = min(1024, (int)((bufferSize + blockSize - 1) / blockSize));
+
+    polluteCaches<<<gridSize, blockSize>>>(d_buffer, bufferSize);
+    cudaDeviceSynchronize();
+    cudaFree(d_buffer);
+}
+
 int AddShape2DFunction(size_t idx, shape_2D_func_t func) {
     if (idx >= MAX_SOL_FUNCTIONS) {
         exit(EXIT_FAILURE);
@@ -42,8 +82,12 @@ int AddShape2DFunction(size_t idx, shape_2D_func_t func) {
 
 SOLUTION_DECL(0);
 SOLUTION_DECL(1);
+SOLUTION_DECL(2);
+SOLUTION_DECL(3);
 
 void RegisterSolutions() {
     REGISTER_SOLUTION(0);
     REGISTER_SOLUTION(1);
+    REGISTER_SOLUTION(2);
+    REGISTER_SOLUTION(3);
 }

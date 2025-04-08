@@ -3,6 +3,12 @@
 
 #include <stdlib.h>
 
+#ifdef __cplusplus
+#define EXTERN extern "C"
+#else
+#define EXTERN
+#endif // __cplusplus
+
 #define MAX_SOL_FUNCTIONS (size_t)(32)
 
 typedef int (*shape_func_t)(
@@ -24,6 +30,8 @@ typedef int (*shape_2D_func_t)(
         double *surface,
         double *diameter
 );
+
+EXTERN void CleanGPUCache();
 
 #ifdef __cplusplus
 

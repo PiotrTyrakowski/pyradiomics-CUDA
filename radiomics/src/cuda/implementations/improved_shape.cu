@@ -5,14 +5,14 @@
 // CUDA Kernels
 // ------------------------------
 
-#include "shape/basic_implementation.cuh"
-#include "volumetry/basic_implementation.cuh"
+#include "shape/improved_shape.cuh"
+#include "volumetry/improved_atomic_implementation.cuh"
 
 // ------------------------------
 // Host wrapper
 // ------------------------------
 
-SOLUTION_DECL(0) {
+SOLUTION_DECL(3) {
     return CUDA_BASIC_LAUNCH_SOLUTION(
         calculate_coefficients_kernel,
         calculate_meshDiameter_kernel
