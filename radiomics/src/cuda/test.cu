@@ -83,9 +83,11 @@ int AddShape2DFunction(size_t idx, shape_2D_func_t func) {
 SOLUTION_DECL(0);
 SOLUTION_DECL(1);
 SOLUTION_DECL(2);
+SOLUTION_DECL(3);
 
 void RegisterSolutions() {
     REGISTER_SOLUTION(0);
     REGISTER_SOLUTION(1);
     REGISTER_SOLUTION(2);
+    REGISTER_SOLUTION(3);
 }
