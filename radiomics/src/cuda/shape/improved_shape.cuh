@@ -15,6 +15,37 @@ static __global__ void calculate_coefficients_kernel(
     const int iy = blockIdx.y * blockDim.y + threadIdx.y;
     const int iz = blockIdx.z * blockDim.z + threadIdx.z;
 
+    /* Load data to shared memory */
+    __shared__ int8_t s_triTable[128][16];
+    __shared__ double s_vertList[12][3];
+    __shared__ int8_t s_gridAngles[8][3];
+
+    const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
+    const int blockSize = blockDim.x * blockDim.y * blockDim.z;
+
+    // Load triTable (have threads load multiple elements)
+    for (int i = tid; i < 128*16; i += blockSize) {
+        const int row = i / 16;
+        const int col = i % 16;
+        s_triTable[row][col] = d_triTable[row][col];
+    }
+
+    // Load vertList
+    for (int i = tid; i < 12*3; i += blockSize) {
+        const int row = i / 3;
+        const int col = i % 3;
+        s_vertList[row][col] = d_vertList[row][col];
+    }
+
+    // Load gridAngles
+    for (int i = tid; i < 8*3; i += blockSize) {
+        const int row = i / 3;
+        const int col = i % 3;
+        s_gridAngles[row][col] = d_gridAngles[row][col];
+    }
+
+    __syncthreads();
+
     // Bounds check: Ensure the indices are within the valid range for cube
     // origins
     if (iz >= size[0] - 1 || iy >= size[1] - 1 || ix >= size[2] - 1) {
@@ -25,13 +56,13 @@ static __global__ void calculate_coefficients_kernel(
     unsigned char cube_idx = 0;
     for (int a_idx = 0; a_idx < 8; a_idx+=2) {
         // Calculate the linear index for each corner of the cube
-        const int corner_idx_1 = (iz + d_gridAngles[a_idx][0]) * strides[0] +
-                         (iy + d_gridAngles[a_idx][1]) * strides[1] +
-                         (ix + d_gridAngles[a_idx][2]) * strides[2];
+        const int corner_idx_1 = (iz + s_gridAngles[a_idx][0]) * strides[0] +
+                         (iy + s_gridAngles[a_idx][1]) * strides[1] +
+                         (ix + s_gridAngles[a_idx][2]) * strides[2];
 
-        const int corner_idx_2 = (iz + d_gridAngles[a_idx + 1][0]) * strides[0] +
-                         (iy + d_gridAngles[a_idx + 1][1]) * strides[1] +
-                         (ix + d_gridAngles[a_idx + 1][2]) * strides[2];
+        const int corner_idx_2 = (iz + s_gridAngles[a_idx + 1][0]) * strides[0] +
+                         (iy + s_gridAngles[a_idx + 1][1]) * strides[1] +
+                         (ix + s_gridAngles[a_idx + 1][2]) * strides[2];
 
         cube_idx |= (1 << a_idx) * (mask[corner_idx_1] != 0);
         cube_idx |= (1 << (a_idx + 1)) * (mask[corner_idx_2] != 0);
@@ -53,58 +84,48 @@ static __global__ void calculate_coefficients_kernel(
     // --- Store Vertices for Diameter Calculation ---
     // Store vertices on edges 6, 7, 11 if the corresponding points (bits 6, 4, 3)
     // are set in the *potentially flipped* cube_idx, matching the C code logic.
-    int num_new_vertices = 0;
-    double new_vertices_local[3 * 3]; // Max 3 vertices * 3 coordinates
+    const int num_new_vertices =
+        ((cube_idx & (1 << 6)) != 0) +
+        ((cube_idx & (1 << 4)) != 0) +
+        ((cube_idx & (1 << 3)) != 0);
 
-    // Check bit 6 (original point p6, edge 6) using potentially flipped cube_idx
-    if (cube_idx & (1 << 6)) {
-        static constexpr int kEdgeIdx = 6;
-
-        new_vertices_local[num_new_vertices * 3 + 0] =
-                (((double) iz) + d_vertList[kEdgeIdx][0]) * spacing[0];
-        new_vertices_local[num_new_vertices * 3 + 1] =
-                (((double) iy) + d_vertList[kEdgeIdx][1]) * spacing[1];
-        new_vertices_local[num_new_vertices * 3 + 2] =
-                (((double) ix) + d_vertList[kEdgeIdx][2]) * spacing[2];
-        num_new_vertices++;
-    }
-
-    // Check bit 4 (original point p4, edge 7) using potentially flipped cube_idx
-    if (cube_idx & (1 << 4)) {
-        static constexpr int kEdgeIdx = 7;
-
-        new_vertices_local[num_new_vertices * 3 + 0] =
-                (((double) iz) + d_vertList[kEdgeIdx][0]) * spacing[0];
-        new_vertices_local[num_new_vertices * 3 + 1] =
-                (((double) iy) + d_vertList[kEdgeIdx][1]) * spacing[1];
-        new_vertices_local[num_new_vertices * 3 + 2] =
-                (((double) ix) + d_vertList[kEdgeIdx][2]) * spacing[2];
-        num_new_vertices++;
-    }
-
-    // Check bit 3 (original point p3, edge 11) using potentially flipped cube_idx
-    if (cube_idx & (1 << 3)) {
-        static constexpr int kEdgeidx = 11;
-        new_vertices_local[num_new_vertices * 3 + 0] =
-                (((double) iz) + d_vertList[kEdgeidx][0]) * spacing[0];
-        new_vertices_local[num_new_vertices * 3 + 1] =
-                (((double) iy) + d_vertList[kEdgeidx][1]) * spacing[1];
-        new_vertices_local[num_new_vertices * 3 + 2] =
-                (((double) ix) + d_vertList[kEdgeidx][2]) * spacing[2];
-        num_new_vertices++;
-    }
-
-    // Atomically reserve space and store vertices if any were found
     if (num_new_vertices > 0) {
         unsigned long long start_v_idx =
                 atomicAdd(vertex_count, (unsigned long long) num_new_vertices);
 
-        for (int v = 0; v < num_new_vertices; ++v) {
-            unsigned long long write_idx = start_v_idx + v;
-            vertices[write_idx * 3 + 0] = new_vertices_local[v * 3 + 0];
-            vertices[write_idx * 3 + 1] = new_vertices_local[v * 3 + 1];
-            vertices[write_idx * 3 + 2] = new_vertices_local[v * 3 + 2];
+        double* p_table = vertices + start_v_idx * 3;
+
+        // Check bit 6 (original point p6, edge 6) using potentially flipped cube_idx
+        if (cube_idx & (1 << 6)) {
+            static constexpr int kEdgeIdx = 6;
+
+            p_table[0] = (((double) iz) + s_vertList[kEdgeIdx][0]) * spacing[0];
+            p_table[1] = (((double) iy) + s_vertList[kEdgeIdx][1]) * spacing[1];
+            p_table[2] = (((double) ix) + s_vertList[kEdgeIdx][2]) * spacing[2];
+
+            p_table += 3;
         }
+
+        // Check bit 4 (original point p4, edge 7) using potentially flipped cube_idx
+        if (cube_idx & (1 << 4)) {
+            static constexpr int kEdgeIdx = 7;
+
+            p_table[0] = (((double) iz) + s_vertList[kEdgeIdx][0]) * spacing[0];
+            p_table[1] = (((double) iy) + s_vertList[kEdgeIdx][1]) * spacing[1];
+            p_table[2] = (((double) ix) + s_vertList[kEdgeIdx][2]) * spacing[2];
+
+            p_table += 3;
+        }
+
+        // Check bit 3 (original point p3, edge 11) using potentially flipped cube_idx
+        if (cube_idx & (1 << 3)) {
+            static constexpr int kEdgeidx = 11;
+
+            p_table[0] = (((double) iz) + s_vertList[kEdgeidx][0]) * spacing[0];
+            p_table[1] = (((double) iy) + s_vertList[kEdgeidx][1]) * spacing[1];
+            p_table[2] = (((double) ix) + s_vertList[kEdgeidx][2]) * spacing[2];
+        }
+
     }
 
     // --- Process Triangles for Surface Area and Volume ---
@@ -113,25 +134,25 @@ static __global__ void calculate_coefficients_kernel(
 
     int t = 0;
     // Iterate through triangles defined in d_triTable for the current cube_idx
-    while (d_triTable[cube_idx][t * 3] >= 0) {
+    while (s_triTable[cube_idx][t * 3] >= 0) {
         double p1[3], p2[3], p3[3]; // Triangle vertex coordinates
         double v1[3], v2[3], cross[3]; // Vectors for calculations
 
         // Get vertex indices from the table
-        int v_idx_1 = d_triTable[cube_idx][t * 3];
-        int v_idx_2 = d_triTable[cube_idx][t * 3 + 1];
-        int v_idx_3 = d_triTable[cube_idx][t * 3 + 2];
+        int v_idx_1 = s_triTable[cube_idx][t * 3];
+        int v_idx_2 = s_triTable[cube_idx][t * 3 + 1];
+        int v_idx_3 = s_triTable[cube_idx][t * 3 + 2];
 
         // Calculate absolute coordinates for each vertex
         for (int d = 0; d < 3; ++d) {
             p1[d] = (((double) (d == 0 ? iz : (d == 1 ? iy : ix))) +
-                     d_vertList[v_idx_1][d]) *
+                     s_vertList[v_idx_1][d]) *
                     spacing[d];
             p2[d] = (((double) (d == 0 ? iz : (d == 1 ? iy : ix))) +
-                     d_vertList[v_idx_2][d]) *
+                     s_vertList[v_idx_2][d]) *
                     spacing[d];
             p3[d] = (((double) (d == 0 ? iz : (d == 1 ? iy : ix))) +
-                     d_vertList[v_idx_3][d]) *
+                     s_vertList[v_idx_3][d]) *
                     spacing[d];
         }
 
