@@ -88,7 +88,6 @@ SOLUTION_DECL(1);
 SOLUTION_DECL(2);
 SOLUTION_DECL(3);
 SOLUTION_DECL(4);
-SOLUTION_DECL(5);
 
 void RegisterSolutions() {
   REGISTER_SOLUTION(0, "Basic implementation");
@@ -96,6 +95,5 @@ void RegisterSolutions() {
   REGISTER_SOLUTION(2, "Added async data copy");
   REGISTER_SOLUTION(3, "Added simple shared memory");
   REGISTER_SOLUTION(4, "Less work for diameters");
-  REGISTER_SOLUTION(5, "Structures vector array");
 
 }

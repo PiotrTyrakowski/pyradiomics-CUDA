@@ -7,4 +7,4 @@ struct VertexStructure {
     double* z;  // Array of z-coordinates
 };
 
-#endif // VERTEX_STRUCTURE_CUH 
+#endif 
