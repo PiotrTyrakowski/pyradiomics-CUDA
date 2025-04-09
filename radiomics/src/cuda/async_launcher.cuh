@@ -193,10 +193,10 @@ cleanup:
     if (diameters_sq_dev) CUDA_CHECK_EXIT(cudaFreeAsync(diameters_sq_dev, stream));
 
     // Pinned host memory cleanup
-    if (surfaceArea_host) CUDA_CHECK_EXIT(cudaFreeAsync(surfaceArea_host, stream));
-    if (volume_host) CUDA_CHECK_EXIT(cudaFreeAsync(volume_host, stream));
-    if (vertex_count_host) CUDA_CHECK_EXIT(cudaFreeAsync(vertex_count_host, stream));
-    if (diameters_sq_host) CUDA_CHECK_EXIT(cudaFreeAsync(diameters_sq_host, stream));
+    if (surfaceArea_host) CUDA_CHECK_EXIT(cudaFreeHost(surfaceArea_host));
+    if (volume_host) CUDA_CHECK_EXIT(cudaFreeHost(volume_host));
+    if (vertex_count_host) CUDA_CHECK_EXIT(cudaFreeHost(vertex_count_host));
+    if (diameters_sq_host) CUDA_CHECK_EXIT(cudaFreeHost(diameters_sq_host));
 
     END_MEASUREMENT(1);
 
