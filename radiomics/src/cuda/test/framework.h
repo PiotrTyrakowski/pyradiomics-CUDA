@@ -49,6 +49,7 @@ typedef struct test_result {
 
 typedef struct app_state {
     int verbose_flag;
+    int detailed_flag;
 
     const char **input_files;
     size_t size_files;
