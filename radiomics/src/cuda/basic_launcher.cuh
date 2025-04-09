@@ -114,8 +114,6 @@ int basic_cuda_launcher(
         END_MEASUREMENT(1);
     }
 
-    START_MEASUREMENT(2, "Volumetric Kernel");
-
     // --- 5. Copy Results (SA, Volume, vertex count) back to Host ---
     CUDA_CHECK_GOTO(cudaMemcpy(&surfaceArea_host, surfaceArea_dev, sizeof(double),
                             cudaMemcpyDeviceToHost), cleanup);
@@ -137,6 +135,8 @@ int basic_cuda_launcher(
                 vertex_count_host, (unsigned long long) max_possible_vertices);
         vertex_count_host = max_possible_vertices;
     }
+
+    START_MEASUREMENT(2, "Volumetric Kernel");
 
     // --- 6. Launch Diameter Kernel (only if vertices were generated) ---
     if (vertex_count_host > 0) {
