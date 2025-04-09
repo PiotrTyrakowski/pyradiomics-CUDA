@@ -17,6 +17,7 @@ add_library(CUDA_LIB STATIC ${CUDA_SOURCES})
 set_property(TARGET CUDA_LIB PROPERTY CUDA_ARCHITECTURES 60)
 
 target_include_directories(CUDA_LIB PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(CUDA_LIB PRIVATE ENABLE_TIME_MEASUREMENT)
 
 # ------------------------------
 # Pyradiomics C

@@ -11,9 +11,20 @@
 // defines
 // ------------------------------
 
+#ifdef __cplusplus
+#define BEGIN_DECL_C extern "C" {
+#define END_DECL_C }
+#else
+#define BEGIN_DECL_C
+#define END_DECL_C
+#endif // __cplusplus
+
+BEGIN_DECL_C
+
 typedef struct time_measurement {
     uint64_t time_ns;
     char *name;
+    uint32_t retries;
 } time_measurement_t;
 
 #define MAX_MEASUREMENTS 32
@@ -39,6 +50,8 @@ typedef struct test_result {
 
 typedef struct app_state {
     int verbose_flag;
+    int detailed_flag;
+    int num_rep_tests;
 
     const char **input_files;
     size_t size_files;
@@ -47,9 +60,13 @@ typedef struct app_state {
 
     test_result_t results[MAX_RESULTS];
     size_t results_counter;
+
+    test_result_t* current_test;
 } app_state_t;
 
 #define FILE_PATH_SEPARATOR "/"
+
+#define MAIN_MEASUREMENT_NAME "Full execution time"
 
 // ------------------------------
 // Data functions
@@ -101,6 +118,8 @@ void FinalizeTesting();
 
 test_result_t *AllocResults();
 
+test_result_t* GetOngoingTest();
+
 #define PREPARE_TEST_RESULT(test_result, ...) \
     do { \
         char *name = (char *) malloc(256); \
@@ -111,5 +130,7 @@ test_result_t *AllocResults();
 data_ptr_t ParseData(const char *filename);
 
 void CleanupData(data_ptr_t data);
+
+END_DECL_C
 
 #endif // CANCERSOLVER_FRAMEWORK_H

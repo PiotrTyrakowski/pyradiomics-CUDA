@@ -12,7 +12,7 @@
 #include <cshape.h>
 #include <math.h>
 
-#define TEST_ACCURACY (1e+6 * DBL_EPSILON)
+#define TEST_ACCURACY (1e+8 * DBL_EPSILON)
 
 // ------------------------------
 // Application state
@@ -20,11 +20,14 @@
 
 app_state_t g_AppState = {
     .verbose_flag = 0,
+    .detailed_flag = 0,
+    .num_rep_tests = 10,
     .input_files = NULL,
     .size_files = 0,
     .output_file = "./out.txt",
     .results = {},
     .results_counter = 0,
+    .current_test = NULL,
 };
 
 // ------------------------------
@@ -206,7 +209,7 @@ static result_t RunTestOnDefaultFunc_(data_ptr_t data) {
     time_measurement_t measurement;
     PREPARE_DATA_MEASUREMENT(
         measurement,
-        "Pyradiomics implementation"
+        MAIN_MEASUREMENT_NAME
     );
 
     calculate_coefficients(
@@ -246,34 +249,36 @@ static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
     test_result_t *test_result = AllocResults();
     PREPARE_TEST_RESULT(
         test_result,
-        "Custom implementation with idx: %lu",
-        idx
+        "Custom implementation with idx: %lu and name \"%s\"",
+        idx,
+        g_ShapeFunctionNames[idx]
     );
 
-    time_measurement_t measurement;
-    PREPARE_DATA_MEASUREMENT(
-        measurement,
-        "Custom implementation with idx: %lu",
-        idx
-    );
+    for (int retry = 0; retry < g_AppState.num_rep_tests; ++retry) {
+        time_measurement_t measurement;
+        PREPARE_DATA_MEASUREMENT(
+            measurement,
+            MAIN_MEASUREMENT_NAME
+        );
 
-    result_t result = {0};
-    func(
-        data->mask,
-        data->size,
-        data->strides,
-        data->spacing,
+        result_t result = {0};
+        func(
+            data->mask,
+            data->size,
+            data->strides,
+            data->spacing,
 
-        &result.surface_area,
-        &result.volume,
-        result.diameters
-    );
+            &result.surface_area,
+            &result.volume,
+            result.diameters
+        );
 
-    EndMeasurement(&measurement);
-    AddDataMeasurement(test_result, measurement);
+        EndMeasurement(&measurement);
+        AddDataMeasurement(test_result, measurement);
 
-    assert(data->is_result_provided);
-    ValidateResult_(test_result, data, &result);
+        assert(data->is_result_provided);
+        ValidateResult_(test_result, data, &result);
+    }
 }
 
 static void RunTest_(const char *input) {
@@ -317,9 +322,38 @@ static void PrintSeparator_(FILE *file, size_t columns) {
     fputs("\n", file);
 }
 
-static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t results_size, size_t idx) {
+static time_measurement_t *GetMeasurement_(test_result_t *result, const char *name) {
+    assert(result != NULL);
+    assert(name != NULL);
+
+    for (size_t i = 0; i < result->measurement_counter; ++i) {
+        if (strcmp(result->measurements[i].name, name) == 0) {
+            return &result->measurements[i];
+        }
+    }
+
+    return NULL;
+}
+
+static uint64_t GetAverageTime_(const time_measurement_t* measurement) {
+    assert(measurement->retries == g_AppState.num_rep_tests || measurement->retries == 1);
+    return measurement->time_ns / measurement->retries;
+}
+
+static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t results_size, size_t idx, const char *name) {
     const size_t test_sum = GetTestCount_();
-    fprintf(file, "Performance Matrix:\n\n");
+    fprintf(file, "Performance Matrix for measurement %s:\n\n", name);
+
+    /* Display descriptor table */
+    fprintf(file, "Descriptor table:\n");
+    for (size_t i = 0; i < MAX_SOL_FUNCTIONS; ++i) {
+        if (g_ShapeFunctions[i] == NULL) {
+            continue;
+        }
+
+        fprintf(file, "Function %lu: %s\n", i + 1, g_ShapeFunctionNames[i]);
+    }
+    fprintf(file, "\n");
 
     /* Print upper header - 16 char wide column */
     fputs(" row/col        |", file);
@@ -339,28 +373,21 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
         fprintf(file, " %14lu |", i);
 
         for (size_t ii = 0; ii < test_sum; ++ii) {
-            if (ii > i) {
-                /* We are in the upper triangle */
-                fputs("                ", file);
-
-                if (ii != test_sum - 1) {
-                    fputs("|", file);
-                }
-
-                continue;
-            }
-
             /* Get full time measurement */
             const size_t row_idx = idx * test_sum + i;
             const size_t col_idx = idx * test_sum + ii;
 
-            const time_measurement_t measurement_row = results[row_idx].measurements[0];
-            const time_measurement_t measurement_col = results[col_idx].measurements[0];
+            const time_measurement_t *measurement_row = GetMeasurement_(results + row_idx, name);
+            const time_measurement_t *measurement_col = GetMeasurement_(results + col_idx, name);
 
-            const double coef =
-                (double) measurement_row.time_ns / (double) measurement_col.time_ns;
+            if (measurement_col && measurement_row) {
+                const double coef =
+                        (double) GetAverageTime_(measurement_row) / (double) GetAverageTime_(measurement_col);
 
-            fprintf(file, " %14.4f ", coef);
+                fprintf(file, " %14.4f ", coef);
+            } else {
+                fprintf(file, " %14s ", "N/A");
+            }
 
             if (ii != test_sum - 1) {
                 fputs("|", file);
@@ -376,6 +403,45 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
     }
 
     fputs("\n", file);
+}
+
+static int ShouldPrint_(const char **names, size_t *top, const char *name) {
+    if (strcmp(name, MAIN_MEASUREMENT_NAME) == 0) {
+        return 0;
+    }
+
+    for (size_t i = 0; i < *top; ++i) {
+        if (strcmp(names[i], name) == 0) {
+            return 0;
+        }
+    }
+
+    names[*top] = name;
+    (*top)++;
+    return 1;
+}
+
+static void DisplayAllMatricesIfNeeded_(FILE *file, size_t idx) {
+    if (!g_AppState.detailed_flag) {
+        return;
+    }
+
+    const char *printed_matrices[2 * MAX_MEASUREMENTS];
+    size_t top = 0;
+
+    const size_t test_sum = GetTestCount_();
+
+    for (size_t i = idx * test_sum; i < idx * test_sum + test_sum; ++i) {
+        const test_result_t *result = g_AppState.results + i;
+
+        for (size_t j = 0; j < result->measurement_counter; ++j) {
+            const time_measurement_t *measurement = &result->measurements[j];
+
+            if (ShouldPrint_(printed_matrices, &top, measurement->name)) {
+                DisplayPerfMatrix_(file, g_AppState.results, g_AppState.results_counter, idx, measurement->name);
+            }
+        }
+    }
 }
 
 // ------------------------------
@@ -410,6 +476,23 @@ void ParseCLI(int argc, const char **argv) {
                 FailApplication("No output filename specified after -o|--output.");
             }
             g_AppState.output_file = argv[++i];
+        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            DisplayHelp();
+            exit(EXIT_SUCCESS);
+        } else if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--detailed") == 0) {
+            g_AppState.detailed_flag = 1;
+        } else if (strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--retries") == 0) {
+            if (i + 1 >= argc) {
+                FailApplication("No number of retries specified after -r|--retries.");
+            }
+
+            const int retries = atoi(argv[++i]);
+
+            if (retries <= 0) {
+                FailApplication("Invalid number of retries specified after -r|--retries.");
+            }
+
+            g_AppState.num_rep_tests = retries;
         } else {
             FailApplication("Unknown option provided");
         }
@@ -418,12 +501,14 @@ void ParseCLI(int argc, const char **argv) {
 
 void DisplayHelp() {
     printf(
-        "TEST_APP -f|--files <list of input files>  [-v|--verbose] [-o|--output] <filename = out.txt>\n"
+        "TEST_APP -f|--files <list of input files>  [-v|--verbose] [-o|--output] [-d|--detailed] [-r|--retries <number>]<filename = out.txt>\n"
         "\n"
         "Where:\n"
-        "-f|--files   - list of input data, for each file separate test will be conducted,\n"
-        "-v|--verbose - enables live printing of test progress and various information to the stdout,\n"
-        "-o|--output  - file to which all results will be saved,\n"
+        "-f|--files    - list of input data, for each file separate test will be conducted,\n"
+        "-v|--verbose  - enables live printing of test progress and various information to the stdout,\n"
+        "-o|--output   - file to which all results will be saved,\n"
+        "-d|--detailed - enables detailed output of test results to the stdout,\n"
+        "-r|--retries  - number of retries for each test, default is 10,\n"
     );
 }
 
@@ -475,10 +560,11 @@ void DisplayResults(FILE *file, test_result_t *results, size_t results_size) {
             for (size_t i = 0; i < 24; ++i) { fputs("=====", file); }
             fputs("\n", file);
 
-            const char* filename = g_AppState.input_files[idx / test_sum];
+            const char *filename = g_AppState.input_files[idx / test_sum];
             fprintf(file, "Test directory: %s\n\n", filename);
 
-            DisplayPerfMatrix_(file, results, results_size, idx / test_sum);
+            DisplayPerfMatrix_(file, results, results_size, idx / test_sum, MAIN_MEASUREMENT_NAME);
+            DisplayAllMatricesIfNeeded_(file, idx / test_sum);
         }
 
         fprintf(file, "Test %s:\n", results[idx].function_name);
@@ -490,8 +576,8 @@ void DisplayResults(FILE *file, test_result_t *results, size_t results_size) {
             fprintf(file, "Measurement %lu: %s with time: %fms and %luns\n",
                     j,
                     results[idx].measurements[j].name,
-                    (double) results[idx].measurements[j].time_ns / 1e6,
-                    results[idx].measurements[j].time_ns
+                    (double) GetAverageTime_(&results[idx].measurements[j]) / 1e6,
+                    GetAverageTime_(&results[idx].measurements[j])
             );
         }
 
@@ -556,10 +642,20 @@ void EndMeasurement(time_measurement_t *measurement) {
     measurement->time_ns = end_ns - measurement->time_ns;
 }
 
-void AddDataMeasurement(test_result_t *result, const time_measurement_t measurement) {
+void AddDataMeasurement(test_result_t *result, time_measurement_t measurement) {
     assert(result != NULL);
     assert(result->measurement_counter < MAX_MEASUREMENTS);
 
+    /* try to find existing measurement with same name: */
+    time_measurement_t *existing_measurement = GetMeasurement_(result, measurement.name);
+
+    if (existing_measurement != NULL) {
+        existing_measurement->time_ns += measurement.time_ns;
+        existing_measurement->retries++;
+        return;
+    }
+
+    measurement.retries = 1;
     result->measurements[result->measurement_counter++] = measurement;
 
     TRACE_INFO("New measurement done: %s with time: %lu", measurement.name, measurement.time_ns);
@@ -570,7 +666,14 @@ test_result_t *AllocResults() {
     result->error_logs_counter = 0;
     result->measurement_counter = 0;
 
+    /* Mark the test is running */
+    g_AppState.current_test = result;
+
     return result;
+}
+
+test_result_t *GetOngoingTest() {
+    return g_AppState.current_test;
 }
 
 data_ptr_t ParseData(const char *filename) {

@@ -1,17 +1,19 @@
 #ifndef TABLES_CUH
 #define TABLES_CUH
 
+#include <cinttypes>
+
 // ------------------------------
 // Data tables
 // ------------------------------
 
-static __constant__ int d_gridAngles[8][3] = {
+static __constant__ int8_t d_gridAngles[8][3] = {
     {0, 0, 0}, {0, 0, 1}, {0, 1, 1},
     {0, 1, 0}, {1, 0, 0}, {1, 0, 1},
     {1, 1, 1}, {1, 1, 0}
 };
 
-static __constant__ int d_triTable[128][16] = {
+static __constant__ int8_t d_triTable[128][16] = {
     {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
     {0, 8, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
     {1, 9, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},

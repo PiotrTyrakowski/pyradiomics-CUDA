@@ -1,6 +1,25 @@
 #ifndef LAUNCHER_CUH
 #define LAUNCHER_CUH
 
+#define CUDA_CHECK_GOTO(call, label) \
+    do { \
+        cudaStatus = call; \
+        if (cudaStatus != cudaSuccess) { \
+            fprintf(stderr, "CUDA Error at %s:%d - %s: %s\n", \
+                    __FILE__, __LINE__, #call, cudaGetErrorString(cudaStatus)); \
+            goto label; \
+        } \
+    } while (0)
+
+#define CUDA_CHECK_EXIT(call) \
+    do { \
+        cudaError_t status = call; \
+        if (status != cudaSuccess) { \
+            fprintf(stderr, "CUDA Cleanup Error at %s:%d - %s: %s\n", \
+                    __FILE__, __LINE__, #call, cudaGetErrorString(status)); \
+        } \
+    } while (0)
+
 #define CUDA_LAUNCH_SOLUTION(launcher, main_kernel, diam_kernel) \
     launcher( \
         []( \
