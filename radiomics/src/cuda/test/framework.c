@@ -12,7 +12,7 @@
 #include <cshape.h>
 #include <math.h>
 
-#define TEST_ACCURACY (1e+6 * DBL_EPSILON)
+#define TEST_ACCURACY (1e+8 * DBL_EPSILON)
 
 // ------------------------------
 // Application state
@@ -21,6 +21,7 @@
 app_state_t g_AppState = {
     .verbose_flag = 0,
     .detailed_flag = 0,
+    .num_rep_tests = 10,
     .input_files = NULL,
     .size_files = 0,
     .output_file = "./out.txt",
@@ -253,29 +254,31 @@ static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
         g_ShapeFunctionNames[idx]
     );
 
-    time_measurement_t measurement;
-    PREPARE_DATA_MEASUREMENT(
-        measurement,
-        MAIN_MEASUREMENT_NAME
-    );
+    for (int retry = 0; retry < g_AppState.num_rep_tests; ++retry) {
+        time_measurement_t measurement;
+        PREPARE_DATA_MEASUREMENT(
+            measurement,
+            MAIN_MEASUREMENT_NAME
+        );
 
-    result_t result = {0};
-    func(
-        data->mask,
-        data->size,
-        data->strides,
-        data->spacing,
+        result_t result = {0};
+        func(
+            data->mask,
+            data->size,
+            data->strides,
+            data->spacing,
 
-        &result.surface_area,
-        &result.volume,
-        result.diameters
-    );
+            &result.surface_area,
+            &result.volume,
+            result.diameters
+        );
 
-    EndMeasurement(&measurement);
-    AddDataMeasurement(test_result, measurement);
+        EndMeasurement(&measurement);
+        AddDataMeasurement(test_result, measurement);
 
-    assert(data->is_result_provided);
-    ValidateResult_(test_result, data, &result);
+        assert(data->is_result_provided);
+        ValidateResult_(test_result, data, &result);
+    }
 }
 
 static void RunTest_(const char *input) {
@@ -332,6 +335,11 @@ static time_measurement_t *GetMeasurement_(test_result_t *result, const char *na
     return NULL;
 }
 
+static uint64_t GetAverageTime_(const time_measurement_t* measurement) {
+    assert(measurement->retries == g_AppState.num_rep_tests || measurement->retries == 1);
+    return measurement->time_ns / measurement->retries;
+}
+
 static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t results_size, size_t idx, const char *name) {
     const size_t test_sum = GetTestCount_();
     fprintf(file, "Performance Matrix for measurement %s:\n\n", name);
@@ -374,7 +382,7 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
 
             if (measurement_col && measurement_row) {
                 const double coef =
-                        (double) measurement_row->time_ns / (double) measurement_col->time_ns;
+                        (double) GetAverageTime_(measurement_row) / (double) GetAverageTime_(measurement_col);
 
                 fprintf(file, " %14.4f ", coef);
             } else {
@@ -397,7 +405,7 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
     fputs("\n", file);
 }
 
-static int ShouldPrint_(const char** names, size_t* top, const char* name) {
+static int ShouldPrint_(const char **names, size_t *top, const char *name) {
     if (strcmp(name, MAIN_MEASUREMENT_NAME) == 0) {
         return 0;
     }
@@ -413,21 +421,21 @@ static int ShouldPrint_(const char** names, size_t* top, const char* name) {
     return 1;
 }
 
-static void DisplayAllMatricesIfNeeded_(FILE* file, size_t idx) {
+static void DisplayAllMatricesIfNeeded_(FILE *file, size_t idx) {
     if (!g_AppState.detailed_flag) {
         return;
     }
 
-    const char* printed_matrices[2*MAX_MEASUREMENTS];
+    const char *printed_matrices[2 * MAX_MEASUREMENTS];
     size_t top = 0;
 
     const size_t test_sum = GetTestCount_();
 
     for (size_t i = idx * test_sum; i < idx * test_sum + test_sum; ++i) {
-        const test_result_t* result = g_AppState.results + i;
+        const test_result_t *result = g_AppState.results + i;
 
         for (size_t j = 0; j < result->measurement_counter; ++j) {
-            const time_measurement_t* measurement = &result->measurements[j];
+            const time_measurement_t *measurement = &result->measurements[j];
 
             if (ShouldPrint_(printed_matrices, &top, measurement->name)) {
                 DisplayPerfMatrix_(file, g_AppState.results, g_AppState.results_counter, idx, measurement->name);
@@ -473,6 +481,18 @@ void ParseCLI(int argc, const char **argv) {
             exit(EXIT_SUCCESS);
         } else if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--detailed") == 0) {
             g_AppState.detailed_flag = 1;
+        } else if (strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--retries") == 0) {
+            if (i + 1 >= argc) {
+                FailApplication("No number of retries specified after -r|--retries.");
+            }
+
+            const int retries = atoi(argv[++i]);
+
+            if (retries <= 0) {
+                FailApplication("Invalid number of retries specified after -r|--retries.");
+            }
+
+            g_AppState.num_rep_tests = retries;
         } else {
             FailApplication("Unknown option provided");
         }
@@ -481,13 +501,14 @@ void ParseCLI(int argc, const char **argv) {
 
 void DisplayHelp() {
     printf(
-        "TEST_APP -f|--files <list of input files>  [-v|--verbose] [-o|--output] [-d|--detailed] <filename = out.txt>\n"
+        "TEST_APP -f|--files <list of input files>  [-v|--verbose] [-o|--output] [-d|--detailed] [-r|--retries <number>]<filename = out.txt>\n"
         "\n"
         "Where:\n"
         "-f|--files    - list of input data, for each file separate test will be conducted,\n"
         "-v|--verbose  - enables live printing of test progress and various information to the stdout,\n"
         "-o|--output   - file to which all results will be saved,\n"
         "-d|--detailed - enables detailed output of test results to the stdout,\n"
+        "-r|--retries  - number of retries for each test, default is 10,\n"
     );
 }
 
@@ -555,8 +576,8 @@ void DisplayResults(FILE *file, test_result_t *results, size_t results_size) {
             fprintf(file, "Measurement %lu: %s with time: %fms and %luns\n",
                     j,
                     results[idx].measurements[j].name,
-                    (double) results[idx].measurements[j].time_ns / 1e6,
-                    results[idx].measurements[j].time_ns
+                    (double) GetAverageTime_(&results[idx].measurements[j]) / 1e6,
+                    GetAverageTime_(&results[idx].measurements[j])
             );
         }
 
@@ -621,10 +642,20 @@ void EndMeasurement(time_measurement_t *measurement) {
     measurement->time_ns = end_ns - measurement->time_ns;
 }
 
-void AddDataMeasurement(test_result_t *result, const time_measurement_t measurement) {
+void AddDataMeasurement(test_result_t *result, time_measurement_t measurement) {
     assert(result != NULL);
     assert(result->measurement_counter < MAX_MEASUREMENTS);
 
+    /* try to find existing measurement with same name: */
+    time_measurement_t *existing_measurement = GetMeasurement_(result, measurement.name);
+
+    if (existing_measurement != NULL) {
+        existing_measurement->time_ns += measurement.time_ns;
+        existing_measurement->retries++;
+        return;
+    }
+
+    measurement.retries = 1;
     result->measurements[result->measurement_counter++] = measurement;
 
     TRACE_INFO("New measurement done: %s with time: %lu", measurement.name, measurement.time_ns);

@@ -24,6 +24,7 @@ BEGIN_DECL_C
 typedef struct time_measurement {
     uint64_t time_ns;
     char *name;
+    uint32_t retries;
 } time_measurement_t;
 
 #define MAX_MEASUREMENTS 32
@@ -50,6 +51,7 @@ typedef struct test_result {
 typedef struct app_state {
     int verbose_flag;
     int detailed_flag;
+    int num_rep_tests;
 
     const char **input_files;
     size_t size_files;
