@@ -31,9 +31,82 @@ add_library(PYRADIOMICS STATIC ${PYRADIOMICS_C})
 
 target_include_directories(PYRADIOMICS PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../")
 
-# Add cpython
+# ------------------------------
+# Find Python
+# ------------------------------
 
-find_package(Python3 REQUIRED COMPONENTS Development)
+# Check if .venv directory exists in the project root
+if(EXISTS "${CMAKE_SOURCE_DIR}/../../../.venv")
+    # Use Python from the virtual environment
+    set(PYTHON_EXECUTABLE "${CMAKE_SOURCE_DIR}/../../../.venv/bin/python")
+    if(WIN32)
+        set(PYTHON_EXECUTABLE "${CMAKE_SOURCE_DIR}/../../../.venv/Scripts/python.exe")
+    endif()
+    message(STATUS "Using Python from virtual environment: ${PYTHON_EXECUTABLE}")
+else()
+    # Find system Python
+    find_package(Python3 REQUIRED COMPONENTS Development)
+    set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+    message(STATUS "Using system Python: ${PYTHON_EXECUTABLE}")
+endif()
+
+# Find Python development libraries
+if(NOT DEFINED Python3_INCLUDE_DIRS OR NOT DEFINED Python3_LIBRARIES)
+    # Get Python include directory
+    execute_process(
+        COMMAND ${PYTHON_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_path('include'))"
+        OUTPUT_VARIABLE Python3_INCLUDE_DIRS
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    
+    # Get Python version for library naming
+    execute_process(
+        COMMAND ${PYTHON_EXECUTABLE} -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+        OUTPUT_VARIABLE PYTHON_VERSION
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    
+    # Get Python library path directly 
+    execute_process(
+        COMMAND ${PYTHON_EXECUTABLE} -c "import sysconfig; import os; print(os.path.join(sysconfig.get_config_var('LIBDIR'), sysconfig.get_config_var('LDLIBRARY') or f'libpython{sysconfig.get_config_var(\"VERSION\")}{sysconfig.get_config_var(\"ABIFLAGS\")}.so'))"
+        OUTPUT_VARIABLE Python3_LIBRARIES
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    
+    # Check if file exists
+    if(NOT EXISTS "${Python3_LIBRARIES}")
+        message(WARNING "Python library not found at ${Python3_LIBRARIES}, trying alternative approach")
+        
+        # Try to find the library in standard locations
+        execute_process(
+            COMMAND ${PYTHON_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR'))"
+            OUTPUT_VARIABLE Python3_LIBRARY_DIR
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        
+        find_library(Python3_LIBRARIES 
+                    NAMES python${PYTHON_VERSION} python${PYTHON_VERSION}m libpython${PYTHON_VERSION} libpython${PYTHON_VERSION}m
+                    PATHS ${Python3_LIBRARY_DIR}
+                    PATH_SUFFIXES lib lib64
+                    NO_DEFAULT_PATH)
+                    
+        if(NOT Python3_LIBRARIES)
+            # Last resort: search in the virtual environment
+            find_library(Python3_LIBRARIES 
+                        NAMES python${PYTHON_VERSION} python${PYTHON_VERSION}m libpython${PYTHON_VERSION} libpython${PYTHON_VERSION}m
+                        PATHS "${CMAKE_SOURCE_DIR}/../../../.venv"
+                        PATH_SUFFIXES lib lib64
+                        NO_DEFAULT_PATH)
+        endif()
+    endif()
+    
+    if(NOT Python3_LIBRARIES)
+        message(FATAL_ERROR "Python libraries not found. Please specify Python3_LIBRARIES manually.")
+    endif()
+    
+    message(STATUS "Found Python include dirs: ${Python3_INCLUDE_DIRS}")
+    message(STATUS "Found Python libraries: ${Python3_LIBRARIES}")
+endif()
 
 target_include_directories(PYRADIOMICS PRIVATE ${Python3_INCLUDE_DIRS})
 target_link_libraries(PYRADIOMICS PRIVATE ${Python3_LIBRARIES})
@@ -43,7 +116,7 @@ target_link_libraries(PYRADIOMICS PRIVATE ${Python3_LIBRARIES})
 # ------------------------------
 
 execute_process(
-        COMMAND ${Python3_EXECUTABLE} -c "import numpy; print(numpy.get_include())"
+        COMMAND ${PYTHON_EXECUTABLE} -c "import numpy; print(numpy.get_include())"
         OUTPUT_VARIABLE NUMPY_INCLUDE_DIR
         OUTPUT_STRIP_TRAILING_WHITESPACE
 )
