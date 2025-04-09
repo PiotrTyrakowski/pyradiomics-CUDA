@@ -206,7 +206,7 @@ static result_t RunTestOnDefaultFunc_(data_ptr_t data) {
     time_measurement_t measurement;
     PREPARE_DATA_MEASUREMENT(
         measurement,
-        "Pyradiomics implementation"
+        MAIN_MEASUREMENT_NAME
     );
 
     calculate_coefficients(
@@ -254,8 +254,7 @@ static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
     time_measurement_t measurement;
     PREPARE_DATA_MEASUREMENT(
         measurement,
-        "Full execution time: %lu",
-        idx
+        MAIN_MEASUREMENT_NAME
     );
 
     result_t result = {0};
@@ -318,6 +317,17 @@ static void PrintSeparator_(FILE *file, size_t columns) {
     fputs("\n", file);
 }
 
+static time_measurement_t GetMeasurement_(test_result_t *result, char* name) {
+    assert(result != NULL);
+    assert(name != NULL);
+
+    for (size_t i = 0; i < result->measurement_counter; ++i) {
+        if (strcmp(result->measurements[i].name, name) == 0) {
+            return result->measurements[i];
+        }
+    }
+}
+
 static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t results_size, size_t idx) {
     const size_t test_sum = GetTestCount_();
     fprintf(file, "Performance Matrix:\n\n");
@@ -366,8 +376,8 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
             const size_t row_idx = idx * test_sum + i;
             const size_t col_idx = idx * test_sum + ii;
 
-            const time_measurement_t measurement_row = results[row_idx].measurements[0];
-            const time_measurement_t measurement_col = results[col_idx].measurements[0];
+            const time_measurement_t measurement_row = GetMeasurement_(results + row_idx, MAIN_MEASUREMENT_NAME);
+            const time_measurement_t measurement_col = GetMeasurement_(results + col_idx, MAIN_MEASUREMENT_NAME);
 
             const double coef =
                 (double) measurement_row.time_ns / (double) measurement_col.time_ns;
@@ -395,6 +405,8 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
 // ------------------------------
 
 void ParseCLI(int argc, const char **argv) {
+    g_AppState.current_test = NULL;
+
     if (argc < 2) {
         FailApplication("No -f|--files flag provided...");
     }
@@ -582,7 +594,14 @@ test_result_t *AllocResults() {
     result->error_logs_counter = 0;
     result->measurement_counter = 0;
 
+    /* Mark the test is running */
+    g_AppState.current_test = result;
+
     return result;
+}
+
+test_result_t * GetOngoingTest() {
+    return g_AppState.current_test;
 }
 
 data_ptr_t ParseData(const char *filename) {

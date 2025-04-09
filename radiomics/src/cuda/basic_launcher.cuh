@@ -2,6 +2,7 @@
 #define BASIC_LAUNCHER_CUH
 #include <stdio.h>
 #include "launcher.cuh"
+#include "test/inline_measurment.hpp"
 
 template<class MainKernel, class DiameterKernel>
 int basic_cuda_launcher(
@@ -16,6 +17,8 @@ int basic_cuda_launcher(
     double *diameters
 ) {
     cudaError_t cudaStatus = cudaSuccess;
+
+    START_MEASUREMENT(0, "Data transfer");
 
     // --- Device Memory Pointers ---
     char *mask_dev = NULL;
@@ -117,6 +120,8 @@ int basic_cuda_launcher(
     if (cudaStatus != cudaSuccess)
         goto cleanup;
 
+    END_MEASUREMENT(0);
+
     // --- 4. Launch Marching Cubes Kernel ---
     if (num_cubes > 0) {
         dim3 blockSize(8, 8, 8);
@@ -125,6 +130,7 @@ int basic_cuda_launcher(
                       (size[0] - 1 + blockSize.z - 1) / blockSize.z);
 
         /* Call the main kernel */
+        START_MEASUREMENT(1, "Marching Cubes Kernel");
         main_kernel(
             gridSize,
             blockSize,
@@ -142,7 +148,15 @@ int basic_cuda_launcher(
         cudaStatus = cudaGetLastError();
         if (cudaStatus != cudaSuccess)
             goto cleanup;
+
+        cudaStatus = cudaDeviceSynchronize();
+        if (cudaStatus != cudaSuccess)
+            goto cleanup;
+
+        END_MEASUREMENT(1);
     }
+
+    START_MEASUREMENT(2, "Volumetric Kernel");
 
     // --- 5. Copy Results (SA, Volume, vertex count) back to Host ---
     cudaStatus = cudaMemcpy(&surfaceArea_host, surfaceArea_dev, sizeof(double),
@@ -206,6 +220,8 @@ int basic_cuda_launcher(
         diameters[2] = 0.0;
         diameters[3] = 0.0;
     }
+
+    END_MEASUREMENT(2);
 
     // --- 7. Cleanup: Free GPU memory ---
 cleanup:

@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include "async_stream.cuh"
+#include "test/inline_measurment.hpp"
 
 template<class MainKernel, class DiameterKernel>
 int async_cuda_launcher(
@@ -17,6 +18,8 @@ int async_cuda_launcher(
     double *diameters
 ) {
     cudaError_t cudaStatus = cudaSuccess;
+
+    START_MEASUREMENT(0, "Async launcher Marching cube stage");
 
     // Initialize the async stream if not already done
     AsyncInitStreamIfNeeded();
@@ -69,31 +72,31 @@ int async_cuda_launcher(
     }
 
     // --- 2. Allocate GPU Memory --- (using stream for async allocation if available)
-    cudaStatus = cudaMalloc((void **) &mask_dev, mask_size_bytes);
+    cudaStatus = cudaMallocAsync((void **) &mask_dev, mask_size_bytes, stream);
     if (cudaStatus != cudaSuccess) goto cleanup;
 
-    cudaStatus = cudaMalloc((void **) &size_dev, 3 * sizeof(int));
+    cudaStatus = cudaMallocAsync((void **) &size_dev, 3 * sizeof(int), stream);
     if (cudaStatus != cudaSuccess) goto cleanup;
 
-    cudaStatus = cudaMalloc((void **) &strides_dev, 3 * sizeof(int));
+    cudaStatus = cudaMallocAsync((void **) &strides_dev, 3 * sizeof(int), stream);
     if (cudaStatus != cudaSuccess) goto cleanup;
 
-    cudaStatus = cudaMalloc((void **) &spacing_dev, 3 * sizeof(double));
+    cudaStatus = cudaMallocAsync((void **) &spacing_dev, 3 * sizeof(double), stream);
     if (cudaStatus != cudaSuccess) goto cleanup;
 
-    cudaStatus = cudaMalloc((void **) &surfaceArea_dev, sizeof(double));
+    cudaStatus = cudaMallocAsync((void **) &surfaceArea_dev, sizeof(double), stream);
     if (cudaStatus != cudaSuccess) goto cleanup;
 
-    cudaStatus = cudaMalloc((void **) &volume_dev, sizeof(double));
+    cudaStatus = cudaMallocAsync((void **) &volume_dev, sizeof(double), stream);
     if (cudaStatus != cudaSuccess) goto cleanup;
 
-    cudaStatus = cudaMalloc((void **) &vertex_count_dev, sizeof(unsigned long long));
+    cudaStatus = cudaMallocAsync((void **) &vertex_count_dev, sizeof(unsigned long long), stream);
     if (cudaStatus != cudaSuccess) goto cleanup;
 
-    cudaStatus = cudaMalloc((void **) &diameters_sq_dev, 4 * sizeof(double));
+    cudaStatus = cudaMallocAsync((void **) &diameters_sq_dev, 4 * sizeof(double), stream);
     if (cudaStatus != cudaSuccess) goto cleanup;
 
-    cudaStatus = cudaMalloc((void **) &vertices_dev, vertices_bytes);
+    cudaStatus = cudaMallocAsync((void **) &vertices_dev, vertices_bytes, stream);
     if (cudaStatus != cudaSuccess) goto cleanup;
 
     // --- 3. Initialize Device Memory (Scalars to 0) --- (async operations)
@@ -172,6 +175,9 @@ int async_cuda_launcher(
     cudaStatus = cudaStreamSynchronize(stream);
     if (cudaStatus != cudaSuccess) goto cleanup;
 
+    END_MEASUREMENT(0);
+    START_MEASUREMENT(1, "Async launcher diameter stage");
+
     // Launch diameter kernel only if vertices were generated
     if (*vertex_count_host > 0) {
         size_t num_vertices_actual = (size_t) *vertex_count_host;
@@ -219,26 +225,28 @@ int async_cuda_launcher(
     // --- 9. Cleanup: Free GPU and pinned host memory ---
 cleanup:
     // Device memory cleanup
-    if (mask_dev) cudaFree(mask_dev);
-    if (size_dev) cudaFree(size_dev);
-    if (strides_dev) cudaFree(strides_dev);
-    if (spacing_dev) cudaFree(spacing_dev);
-    if (surfaceArea_dev) cudaFree(surfaceArea_dev);
-    if (volume_dev) cudaFree(volume_dev);
-    if (vertices_dev) cudaFree(vertices_dev);
-    if (vertex_count_dev) cudaFree(vertex_count_dev);
-    if (diameters_sq_dev) cudaFree(diameters_sq_dev);
+    if (mask_dev) cudaFreeAsync(mask_dev, stream);
+    if (size_dev) cudaFreeAsync(size_dev, stream);
+    if (strides_dev) cudaFreeAsync(strides_dev, stream);
+    if (spacing_dev) cudaFreeAsync(spacing_dev, stream);
+    if (surfaceArea_dev) cudaFreeAsync(surfaceArea_dev, stream);
+    if (volume_dev) cudaFreeAsync(volume_dev, stream);
+    if (vertices_dev) cudaFreeAsync(vertices_dev, stream);
+    if (vertex_count_dev) cudaFreeAsync(vertex_count_dev, stream);
+    if (diameters_sq_dev) cudaFreeAsync(diameters_sq_dev, stream);
 
     // Pinned host memory cleanup
-    if (surfaceArea_host) cudaFreeHost(surfaceArea_host);
-    if (volume_host) cudaFreeHost(volume_host);
-    if (vertex_count_host) cudaFreeHost(vertex_count_host);
-    if (diameters_sq_host) cudaFreeHost(diameters_sq_host);
+    if (surfaceArea_host) cudaFreeAsync(surfaceArea_host, stream);
+    if (volume_host) cudaFreeAsync(volume_host, stream);
+    if (vertex_count_host) cudaFreeAsync(vertex_count_host, stream);
+    if (diameters_sq_host) cudaFreeAsync(diameters_sq_host, stream);
 
     if (cudaStatus != cudaSuccess) {
         fprintf(stderr, "CUDA Error occurred: %s\n",
                 cudaGetErrorString(cudaStatus));
     }
+
+    END_MEASUREMENT(1);
 
     return cudaStatus;
 }
