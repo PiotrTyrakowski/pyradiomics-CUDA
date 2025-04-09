@@ -246,14 +246,15 @@ static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
     test_result_t *test_result = AllocResults();
     PREPARE_TEST_RESULT(
         test_result,
-        "Custom implementation with idx: %lu",
-        idx
+        "Custom implementation with idx: %lu and name \"%s\"",
+        idx,
+        g_ShapeFunctionNames[idx]
     );
 
     time_measurement_t measurement;
     PREPARE_DATA_MEASUREMENT(
         measurement,
-        "Custom implementation with idx: %lu",
+        "Full execution time: %lu",
         idx
     );
 
@@ -320,6 +321,17 @@ static void PrintSeparator_(FILE *file, size_t columns) {
 static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t results_size, size_t idx) {
     const size_t test_sum = GetTestCount_();
     fprintf(file, "Performance Matrix:\n\n");
+
+    /* Display descriptor table */
+    fprintf(file, "Descriptor table:\n");
+    for (size_t i = 0; i < MAX_SOL_FUNCTIONS; ++i) {
+        if (g_ShapeFunctions[i] == NULL) {
+            continue;
+        }
+
+        fprintf(file, "Function %lu: %s\n", i + 1, g_ShapeFunctionNames[i]);
+    }
+    fprintf(file, "\n");
 
     /* Print upper header - 16 char wide column */
     fputs(" row/col        |", file);
