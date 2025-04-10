@@ -16,7 +16,6 @@ static __global__ void calculate_meshDiameter_kernel(
     }
 
     /* prepare shared memory for diameters */
-    // TODO:
     __shared__ double s_diameters[4 * 256];
 
     s_diameters[threadIdx.x * 4 + 0] = 0;
@@ -62,17 +61,30 @@ static __global__ void calculate_meshDiameter_kernel(
 
     __syncthreads();
 
-    /* Reduce the table */
-
+    // Parallel reduction to find the maximum values
+    for (unsigned int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (threadIdx.x < stride) {
+            s_diameters[threadIdx.x * 4 + 0] = max(s_diameters[threadIdx.x * 4 + 0],
+                                                  s_diameters[(threadIdx.x + stride) * 4 + 0]);
+            s_diameters[threadIdx.x * 4 + 1] = max(s_diameters[threadIdx.x * 4 + 1],
+                                                  s_diameters[(threadIdx.x + stride) * 4 + 1]);
+            s_diameters[threadIdx.x * 4 + 2] = max(s_diameters[threadIdx.x * 4 + 2],
+                                                  s_diameters[(threadIdx.x + stride) * 4 + 2]);
+            s_diameters[threadIdx.x * 4 + 3] = max(s_diameters[threadIdx.x * 4 + 3],
+                                                  s_diameters[(threadIdx.x + stride) * 4 + 3]);
+        }
+        __syncthreads();
+    }
 
     __syncthreads();
 
     /* here only first thread should survive */
-
-    atomicMax(&diameters_sq[0], s_diameters[0]);
-    atomicMax(&diameters_sq[1], s_diameters[1]);
-    atomicMax(&diameters_sq[2], s_diameters[2]);
-    atomicMax(&diameters_sq[3], s_diameters[3]);
+    if (threadIdx.x == 0) {
+        atomicMax(&diameters_sq[0], s_diameters[0]);
+        atomicMax(&diameters_sq[1], s_diameters[1]);
+        atomicMax(&diameters_sq[2], s_diameters[2]);
+        atomicMax(&diameters_sq[3], s_diameters[3]);
+    }
 }
 
 #endif //SOA_REDUCED_ATOMICS_CUH
