@@ -8,7 +8,9 @@ static __global__ void calculate_meshDiameter_kernel(
     *vertices, // Input: Array of vertex coordinates (x, y, z, x, y, z, ...)
     size_t num_vertices, // Input: Total number of valid vertices in the array
     double *
-    diameters_sq // Output: Array for squared max diameters [YZ, XZ, XY, 3D]
+    diameters_sq, // Output: Array for squared max diameters [YZ, XZ, XY, 3D]
+    [[maybe_unused]] size_t max_vertices
+
     // Initialize this array to 0.0 before launching kernel
 ) {
     // Calculate global thread index and total number of threads

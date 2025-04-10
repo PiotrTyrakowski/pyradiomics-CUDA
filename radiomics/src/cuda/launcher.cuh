@@ -52,12 +52,14 @@
             int threadsPerBlock_diam, \
             const double *vertices, \
             size_t num_vertices, \
-            double *diameters_sq \
+            double *diameters_sq, \
+            size_t max_vertices \
         ) { \
             return diam_kernel<<<numBlocks_diam, threadsPerBlock_diam>>>( \
                 vertices, \
                 num_vertices, \
-                diameters_sq \
+                diameters_sq, \
+                max_vertices \
             ); \
         }, \
         mask, \

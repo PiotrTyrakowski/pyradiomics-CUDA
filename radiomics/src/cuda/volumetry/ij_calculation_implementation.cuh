@@ -49,7 +49,8 @@ static __global__ void calculate_meshDiameter_kernel(
     const double
     *vertices, // Input: Array of vertex coordinates (x, y, z, x, y, z, ...)
     size_t num_vertices, // Input: Total number of valid vertices in the array
-    double *diameters_sq // Output: Array for squared max diameters [YZ, XZ, XY, Overall]
+    double *diameters_sq, // Output: Array for squared max diameters [YZ, XZ, XY, Overall]
+    [[maybe_unused]] size_t max_vertices
 ) {
     // Trivial case: No pairs if less than 2 vertices
     if (num_vertices < 2) {

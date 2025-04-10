@@ -151,7 +151,8 @@ int async_cuda_launcher(
             stream,
             vertices_dev,
             num_vertices_actual,
-            diameters_sq_dev
+            diameters_sq_dev,
+            max_possible_vertices
         );
 
         CUDA_CHECK_GOTO(cudaGetLastError(), cleanup);
@@ -237,12 +238,14 @@ cleanup:
             cudaStream_t stream, \
             const double *vertices, \
             size_t num_vertices, \
-            double *diameters_sq \
+            double *diameters_sq, \
+            size_t max_vertices \
         ) { \
             return diam_kernel<<<numBlocks_diam, threadsPerBlock_diam, 0, stream>>>( \
                 vertices, \
                 num_vertices, \
-                diameters_sq \
+                diameters_sq, \
+                max_vertices \
             ); \
         }, \
         mask, \

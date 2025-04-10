@@ -150,7 +150,8 @@ int basic_cuda_launcher(
             threadsPerBlock_diam,
             vertices_dev,
             num_vertices_actual,
-            diameters_sq_dev
+            diameters_sq_dev,
+            max_possible_vertices
         );
 
         CUDA_CHECK_GOTO(cudaGetLastError(), cleanup);
