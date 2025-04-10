@@ -74,12 +74,12 @@ int basic_cuda_launcher(
     double *vertices_dev = NULL;
     unsigned long long *vertex_count_dev = NULL;
     double *diameters_sq_dev = NULL;
+    double *h_vertices = NULL;
 
     // --- Host-side Accumulators/Temporaries ---
     double surfaceArea_host = 0.0;
     double volume_host = 0.0;
     unsigned long long vertex_count_host = 0;
-    double diameters_sq_host[4] = {0.0, 0.0, 0.0, 0.0};
 
     // --- Determine Allocation Sizes ---
     size_t mask_elements = (size_t) size[0] * size[1] * size[2];
@@ -156,14 +156,20 @@ int basic_cuda_launcher(
     *volume = volume_host / 6.0;
     *surfaceArea = surfaceArea_host;
 
-    double *h_vertices;
-    h_vertices = (double *) malloc(max_possible_vertices * sizeof(double));
-
     /* copy back to cpu */
 
     START_MEASUREMENT(2, "Volumetric Kernel");
-
     if (vertex_count_host > 0) {
+        size_t vertices_to_copy = vertex_count_host * 3 * sizeof(double);
+
+        h_vertices = (double *)malloc(vertices_to_copy);
+
+        // Copy vertices from device to host
+        CUDA_CHECK_GOTO(cudaMemcpy(h_vertices, vertices_dev, vertices_to_copy,
+                            cudaMemcpyDeviceToHost), cleanup);
+
+        // Calculate mesh diameter based on vertices
+        calculate_meshDiameter(h_vertices, vertex_count_host * 3, diameters);
     } else {
         diameters[0] = 0.0;
         diameters[1] = 0.0;
@@ -192,6 +198,8 @@ cleanup:
         CUDA_CHECK_EXIT(cudaFree(vertex_count_dev));
     if (diameters_sq_dev)
         CUDA_CHECK_EXIT(cudaFree(diameters_sq_dev));
+    if (h_vertices)
+        free(h_vertices);
 
     return cudaStatus;
 }
