@@ -14,6 +14,7 @@ int AsyncInitStreamIfNeeded() {
             return -1;
         }
 
+        cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
         g_AsyncStreamInitialized = true;
     }
 

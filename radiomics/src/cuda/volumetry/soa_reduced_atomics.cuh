@@ -1,6 +1,6 @@
 #ifndef SOA_REDUCED_ATOMICS_CUH
 #define SOA_REDUCED_ATOMICS_CUH
-// #include "helpers.cuh"
+#include "constants.cuh"
 
 static __global__ void calculate_meshDiameter_kernel(
     const double *vertices,
@@ -14,13 +14,10 @@ static __global__ void calculate_meshDiameter_kernel(
         return;
     }
 
-    // Padding to avoid bank conflicts (using block size)
-    // For a warp of 32 threads and 32 banks, we add padding of 1 element every 8 doubles
-    // (assuming 32 banks and that each double spans 8 bytes)
-    __shared__ double s_diameter_x[256];
-    __shared__ double s_diameter_y[256 + 1];
-    __shared__ double s_diameter_z[256 + 2];
-    __shared__ double s_diameter_total[256 + 3];
+    __shared__ double s_diameter_x[kBasicLauncherBlockSizeVolumetry];
+    __shared__ double s_diameter_y[kBasicLauncherBlockSizeVolumetry];
+    __shared__ double s_diameter_z[kBasicLauncherBlockSizeVolumetry];
+    __shared__ double s_diameter_total[kBasicLauncherBlockSizeVolumetry];
 
     // Initialize shared memory
     s_diameter_x[threadIdx.x] = 0;
@@ -38,6 +35,11 @@ static __global__ void calculate_meshDiameter_kernel(
     double ay = y_table[tid];
     double az = z_table[tid];
 
+    double max_x = 0;
+    double max_y = 0;
+    double max_z = 0;
+    double max_total = 0;
+
     for (size_t j = tid + 1; j < num_vertices; ++j) {
         double bx = x_table[j];
         double by = y_table[j];
@@ -50,31 +52,34 @@ static __global__ void calculate_meshDiameter_kernel(
         double dist_sq = dx * dx + dy * dy + dz * dz;
 
         if (ax == bx) {
-            s_diameter_x[threadIdx.x] = max(s_diameter_x[threadIdx.x], dist_sq);
+            max_x = max(max_x, dist_sq);
         }
 
         if (ay == by) {
-            s_diameter_y[threadIdx.x + 1] = max(s_diameter_y[threadIdx.x + 1], dist_sq);
+            max_y = max(max_y, dist_sq);
         }
 
         if (az == bz) {
-            s_diameter_z[threadIdx.x + 2] = max(s_diameter_z[threadIdx.x + 2], dist_sq);
+            max_z = max(max_z, dist_sq);
         }
 
-        s_diameter_total[threadIdx.x + 3] = max(s_diameter_total[threadIdx.x + 3], dist_sq);
+        max_total = max(max_total, dist_sq);
     }
+
+    s_diameter_x[threadIdx.x] = max_x;
+    s_diameter_y[threadIdx.x] = max_y;
+    s_diameter_z[threadIdx.x] = max_z;
+    s_diameter_total[threadIdx.x] = max_total;
 
     __syncthreads();
 
-    // Parallel reduction to find the maximum values
-    // Using separate reductions for each array to avoid bank conflicts
     for (unsigned int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
         if (threadIdx.x < stride) {
             s_diameter_x[threadIdx.x] = max(s_diameter_x[threadIdx.x], s_diameter_x[threadIdx.x + stride]);
-            s_diameter_y[threadIdx.x + 1] = max(s_diameter_y[threadIdx.x + 1], s_diameter_y[threadIdx.x + stride + 1]);
-            s_diameter_z[threadIdx.x + 2] = max(s_diameter_z[threadIdx.x + 2], s_diameter_z[threadIdx.x + stride + 2]);
-            s_diameter_total[threadIdx.x + 3] = max(s_diameter_total[threadIdx.x + 3],
-                                                    s_diameter_total[threadIdx.x + stride + 3]);
+            s_diameter_y[threadIdx.x] = max(s_diameter_y[threadIdx.x], s_diameter_y[threadIdx.x + stride]);
+            s_diameter_z[threadIdx.x] = max(s_diameter_z[threadIdx.x], s_diameter_z[threadIdx.x + stride]);
+            s_diameter_total[threadIdx.x] = max(s_diameter_total[threadIdx.x],
+                                                    s_diameter_total[threadIdx.x + stride]);
         }
         __syncthreads();
     }
@@ -84,11 +89,11 @@ static __global__ void calculate_meshDiameter_kernel(
         atomicMax(reinterpret_cast<unsigned long long *>(&diameters_sq[0]),
                   *reinterpret_cast<unsigned long long *>(&s_diameter_x[0]));
         atomicMax(reinterpret_cast<unsigned long long *>(&diameters_sq[1]),
-               *reinterpret_cast<unsigned long long *>(&s_diameter_y[1]));
+               *reinterpret_cast<unsigned long long *>(&s_diameter_y[0]));
         atomicMax(reinterpret_cast<unsigned long long *>(&diameters_sq[2]),
-               *reinterpret_cast<unsigned long long *>(&s_diameter_z[2]));
+               *reinterpret_cast<unsigned long long *>(&s_diameter_z[0]));
         atomicMax(reinterpret_cast<unsigned long long *>(&diameters_sq[3]),
-               *reinterpret_cast<unsigned long long *>(&s_diameter_total[3]));
+               *reinterpret_cast<unsigned long long *>(&s_diameter_total[0]));
     }
 }
 

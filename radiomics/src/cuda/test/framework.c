@@ -21,6 +21,7 @@
 app_state_t g_AppState = {
     .verbose_flag = 0,
     .detailed_flag = 0,
+    .no_errors_flag = 0,
     .num_rep_tests = 10,
     .input_files = NULL,
     .size_files = 0,
@@ -335,7 +336,7 @@ static time_measurement_t *GetMeasurement_(test_result_t *result, const char *na
     return NULL;
 }
 
-static uint64_t GetAverageTime_(const time_measurement_t* measurement) {
+static uint64_t GetAverageTime_(const time_measurement_t *measurement) {
     assert(measurement->retries == g_AppState.num_rep_tests || measurement->retries == 1);
     return measurement->time_ns / measurement->retries;
 }
@@ -493,6 +494,8 @@ void ParseCLI(int argc, const char **argv) {
             }
 
             g_AppState.num_rep_tests = retries;
+        } else if (strcmp(argv[i], "--no-errors") == 0) {
+            g_AppState.no_errors_flag = 1;
         } else {
             FailApplication("Unknown option provided");
         }
@@ -509,6 +512,7 @@ void DisplayHelp() {
         "-o|--output   - file to which all results will be saved,\n"
         "-d|--detailed - enables detailed output of test results to the stdout,\n"
         "-r|--retries  - number of retries for each test, default is 10,\n"
+        "--no-errors   - disable error printing on results,\n"
     );
 }
 
@@ -581,12 +585,14 @@ void DisplayResults(FILE *file, test_result_t *results, size_t results_size) {
             );
         }
 
-        for (size_t i = 0; i < 8; ++i) { fputs("=====", file); }
-        fprintf(file, "\nErrors:\n");
+        if (!g_AppState.no_errors_flag) {
+            for (size_t i = 0; i < 8; ++i) { fputs("=====", file); }
+            fprintf(file, "\nErrors:\n");
 
-        for (size_t j = 0; j < results[idx].error_logs_counter; ++j) {
-            fprintf(file, "Error %lu: %s with value: %s\n", j, results[idx].error_logs[j].name,
-                    results[idx].error_logs[j].value);
+            for (size_t j = 0; j < results[idx].error_logs_counter; ++j) {
+                fprintf(file, "Error %lu: %s with value: %s\n", j, results[idx].error_logs[j].name,
+                        results[idx].error_logs[j].value);
+            }
         }
 
         fprintf(file, "\n\n");

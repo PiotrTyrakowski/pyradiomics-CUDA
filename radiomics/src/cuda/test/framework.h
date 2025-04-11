@@ -51,6 +51,7 @@ typedef struct test_result {
 typedef struct app_state {
     int verbose_flag;
     int detailed_flag;
+    int no_errors_flag;
     int num_rep_tests;
 
     const char **input_files;

@@ -1,5 +1,6 @@
 #ifndef BASIC_LAUNCHER_CUH
 #define BASIC_LAUNCHER_CUH
+#include <constants.cuh>
 #include <stdio.h>
 #include "launcher.cuh"
 #include "test/inline_measurment.hpp"
@@ -141,7 +142,7 @@ int basic_cuda_launcher(
     // --- 6. Launch Diameter Kernel (only if vertices were generated) ---
     if (vertex_count_host > 0) {
         size_t num_vertices_actual = (size_t) vertex_count_host;
-        int threadsPerBlock_diam = 256;
+        int threadsPerBlock_diam = kBasicLauncherBlockSizeVolumetry;
         int numBlocks_diam =
                 (num_vertices_actual + threadsPerBlock_diam - 1) / threadsPerBlock_diam;
 

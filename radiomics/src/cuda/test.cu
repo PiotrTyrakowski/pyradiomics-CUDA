@@ -91,6 +91,7 @@ SOLUTION_DECL(4);
 SOLUTION_DECL(5);
 SOLUTION_DECL(6);
 SOLUTION_DECL(7);
+SOLUTION_DECL(8);
 
 void RegisterSolutions() {
   REGISTER_SOLUTION(0, "Basic implementation");
@@ -100,5 +101,6 @@ void RegisterSolutions() {
   REGISTER_SOLUTION(4, "Less work for diameters");
   REGISTER_SOLUTION(5, "SOA implementation");
   REGISTER_SOLUTION(6, "SOA reduced atomics");
-  REGISTER_SOLUTION(7, "CPU volumetry");
+  // REGISTER_SOLUTION(7, "CPU volumetry");
+  REGISTER_SOLUTION(7, "SOA full n2");
 }
