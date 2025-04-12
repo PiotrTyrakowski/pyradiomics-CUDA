@@ -34,7 +34,7 @@ typedef struct error_log {
     char *value;
 } error_log_t;
 
-#define MAX_ERROR_LOGS 32
+#define MAX_ERROR_LOGS 1024
 
 typedef struct test_result {
     char *function_name;
@@ -51,6 +51,7 @@ typedef struct test_result {
 typedef struct app_state {
     int verbose_flag;
     int detailed_flag;
+    int no_errors_flag;
     int num_rep_tests;
 
     const char **input_files;

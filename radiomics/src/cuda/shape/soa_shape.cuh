@@ -1,6 +1,5 @@
-#ifndef VECTOR_SOA_CUH
-#define VECTOR_SOA_CUH
-
+#ifndef SOA_SHAPE_CUH
+#define SOA_SHAPE_CUH
 
 #include "tables.cuh"
 #include <cstddef>
@@ -9,7 +8,6 @@ static __global__ void calculate_coefficients_kernel(
     const char *mask, const int *size, const int *strides,
     const double *spacing, double *surfaceArea, double *volume,
     double *vertices, unsigned long long *vertex_count, size_t max_vertices) {
-
     // Calculate global thread indices
     const int ix = blockIdx.x * blockDim.x + threadIdx.x;
     const int iy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -24,21 +22,21 @@ static __global__ void calculate_coefficients_kernel(
     const int blockSize = blockDim.x * blockDim.y * blockDim.z;
 
     // Load triTable (have threads load multiple elements)
-    for (int i = tid; i < 128*16; i += blockSize) {
+    for (int i = tid; i < 128 * 16; i += blockSize) {
         const int row = i / 16;
         const int col = i % 16;
         s_triTable[row][col] = d_triTable[row][col];
     }
 
     // Load vertList
-    for (int i = tid; i < 12*3; i += blockSize) {
+    for (int i = tid; i < 12 * 3; i += blockSize) {
         const int row = i / 3;
         const int col = i % 3;
         s_vertList[row][col] = d_vertList[row][col];
     }
 
     // Load gridAngles
-    for (int i = tid; i < 8*3; i += blockSize) {
+    for (int i = tid; i < 8 * 3; i += blockSize) {
         const int row = i / 3;
         const int col = i % 3;
         s_gridAngles[row][col] = d_gridAngles[row][col];
@@ -54,15 +52,15 @@ static __global__ void calculate_coefficients_kernel(
 
     // --- Calculate Cube Index ---
     unsigned char cube_idx = 0;
-    for (int a_idx = 0; a_idx < 8; a_idx+=2) {
+    for (int a_idx = 0; a_idx < 8; a_idx += 2) {
         // Calculate the linear index for each corner of the cube
         const int corner_idx_1 = (iz + s_gridAngles[a_idx][0]) * strides[0] +
-                         (iy + s_gridAngles[a_idx][1]) * strides[1] +
-                         (ix + s_gridAngles[a_idx][2]) * strides[2];
+                                 (iy + s_gridAngles[a_idx][1]) * strides[1] +
+                                 (ix + s_gridAngles[a_idx][2]) * strides[2];
 
         const int corner_idx_2 = (iz + s_gridAngles[a_idx + 1][0]) * strides[0] +
-                         (iy + s_gridAngles[a_idx + 1][1]) * strides[1] +
-                         (ix + s_gridAngles[a_idx + 1][2]) * strides[2];
+                                 (iy + s_gridAngles[a_idx + 1][1]) * strides[1] +
+                                 (ix + s_gridAngles[a_idx + 1][2]) * strides[2];
 
         cube_idx |= (1 << a_idx) * (mask[corner_idx_1] != 0);
         cube_idx |= (1 << (a_idx + 1)) * (mask[corner_idx_2] != 0);
@@ -85,47 +83,49 @@ static __global__ void calculate_coefficients_kernel(
     // Store vertices on edges 6, 7, 11 if the corresponding points (bits 6, 4, 3)
     // are set in the *potentially flipped* cube_idx, matching the C code logic.
     const int num_new_vertices =
-        ((cube_idx & (1 << 6)) != 0) +
-        ((cube_idx & (1 << 4)) != 0) +
-        ((cube_idx & (1 << 3)) != 0);
+            ((cube_idx & (1 << 6)) != 0) +
+            ((cube_idx & (1 << 4)) != 0) +
+            ((cube_idx & (1 << 3)) != 0);
 
     if (num_new_vertices > 0) {
         unsigned long long start_v_idx =
                 atomicAdd(vertex_count, (unsigned long long) num_new_vertices);
 
-        double* p_table = vertices + start_v_idx * 3;
+        double* x_table = vertices + (0 * max_vertices) + start_v_idx;
+        double* y_table = vertices + (1 * max_vertices) + start_v_idx;
+        double* z_table = vertices + (2 * max_vertices) + start_v_idx;
+        size_t idx = 0;
 
         // Check bit 6 (original point p6, edge 6) using potentially flipped cube_idx
         if (cube_idx & (1 << 6)) {
             static constexpr int kEdgeIdx = 6;
 
-            p_table[0] = (((double) iz) + s_vertList[kEdgeIdx][0]) * spacing[0];
-            p_table[1] = (((double) iy) + s_vertList[kEdgeIdx][1]) * spacing[1];
-            p_table[2] = (((double) ix) + s_vertList[kEdgeIdx][2]) * spacing[2];
+            x_table[0] = (((double) ix) + s_vertList[kEdgeIdx][2]) * spacing[2];
+            y_table[0] = (((double) iy) + s_vertList[kEdgeIdx][1]) * spacing[1];
+            z_table[0] = (((double) iz) + s_vertList[kEdgeIdx][0]) * spacing[0];
 
-            p_table += 3;
+            idx = 1;
         }
 
         // Check bit 4 (original point p4, edge 7) using potentially flipped cube_idx
         if (cube_idx & (1 << 4)) {
             static constexpr int kEdgeIdx = 7;
 
-            p_table[0] = (((double) iz) + s_vertList[kEdgeIdx][0]) * spacing[0];
-            p_table[1] = (((double) iy) + s_vertList[kEdgeIdx][1]) * spacing[1];
-            p_table[2] = (((double) ix) + s_vertList[kEdgeIdx][2]) * spacing[2];
+            x_table[idx] = (((double) ix) + s_vertList[kEdgeIdx][2]) * spacing[2];
+            y_table[idx] = (((double) iy) + s_vertList[kEdgeIdx][1]) * spacing[1];
+            z_table[idx] = (((double) iz) + s_vertList[kEdgeIdx][0]) * spacing[0];
 
-            p_table += 3;
+            ++idx;
         }
 
         // Check bit 3 (original point p3, edge 11) using potentially flipped cube_idx
         if (cube_idx & (1 << 3)) {
             static constexpr int kEdgeidx = 11;
 
-            p_table[0] = (((double) iz) + s_vertList[kEdgeidx][0]) * spacing[0];
-            p_table[1] = (((double) iy) + s_vertList[kEdgeidx][1]) * spacing[1];
-            p_table[2] = (((double) ix) + s_vertList[kEdgeidx][2]) * spacing[2];
+            x_table[idx] = (((double) ix) + s_vertList[kEdgeidx][2]) * spacing[2];
+            y_table[idx] = (((double) iy) + s_vertList[kEdgeidx][1]) * spacing[1];
+            z_table[idx] = (((double) iz) + s_vertList[kEdgeidx][0]) * spacing[0];
         }
-
     }
 
     // --- Process Triangles for Surface Area and Volume ---
@@ -186,4 +186,4 @@ static __global__ void calculate_coefficients_kernel(
               sign_correction * local_Vol); // Apply sign correction for volume
 }
 
-#endif //IMPROVED_SHAPE_CUH
+#endif //SOA_SHAPE_CUH

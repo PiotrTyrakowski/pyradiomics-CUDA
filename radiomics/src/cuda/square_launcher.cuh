@@ -1,5 +1,6 @@
-#ifndef BASIC_LAUNCHER_CUH
-#define BASIC_LAUNCHER_CUH
+#ifndef SQUARE_LAUNCHER_CUH
+#define SQUARE_LAUNCHER_CUH
+
 #include <constants.cuh>
 #include <stdio.h>
 #include "launcher.cuh"
@@ -80,9 +81,9 @@ int basic_cuda_launcher(
     CUDA_CHECK_GOTO(cudaMemcpy(mask_dev, mask, mask_size_bytes, cudaMemcpyHostToDevice), cleanup);
     CUDA_CHECK_GOTO(cudaMemcpy(size_dev, size, 3 * sizeof(int), cudaMemcpyHostToDevice), cleanup);
     CUDA_CHECK_GOTO(cudaMemcpy(strides_dev, calculated_strides_host, 3 * sizeof(int),
-                            cudaMemcpyHostToDevice), cleanup);
+                        cudaMemcpyHostToDevice), cleanup);
     CUDA_CHECK_GOTO(cudaMemcpy(spacing_dev, spacing, 3 * sizeof(double),
-                            cudaMemcpyHostToDevice), cleanup);
+                        cudaMemcpyHostToDevice), cleanup);
 
     END_MEASUREMENT(0);
 
@@ -117,11 +118,11 @@ int basic_cuda_launcher(
 
     // --- 5. Copy Results (SA, Volume, vertex count) back to Host ---
     CUDA_CHECK_GOTO(cudaMemcpy(&surfaceArea_host, surfaceArea_dev, sizeof(double),
-                            cudaMemcpyDeviceToHost), cleanup);
+                        cudaMemcpyDeviceToHost), cleanup);
     CUDA_CHECK_GOTO(cudaMemcpy(&volume_host, volume_dev, sizeof(double),
-                            cudaMemcpyDeviceToHost), cleanup);
+                        cudaMemcpyDeviceToHost), cleanup);
     CUDA_CHECK_GOTO(cudaMemcpy(&vertex_count_host, vertex_count_dev,
-                            sizeof(unsigned long long), cudaMemcpyDeviceToHost), cleanup);
+                        sizeof(unsigned long long), cudaMemcpyDeviceToHost), cleanup);
 
     // Final adjustments and storing results
     *volume = volume_host / 6.0;
@@ -141,23 +142,23 @@ int basic_cuda_launcher(
 
     // --- 6. Launch Diameter Kernel (only if vertices were generated) ---
     if (vertex_count_host > 0) {
-        size_t num_vertices_actual = (size_t) vertex_count_host;
-        int threadsPerBlock_diam = kBasicLauncherBlockSizeVolumetry;
-        int numBlocks_diam =
-                (num_vertices_actual + threadsPerBlock_diam - 1) / threadsPerBlock_diam;
+        constexpr dim3 blockSize(kBasicLauncherBlockSizeVolumetry);
+        const size_t length = (vertex_count_host + kBasicLauncherBlockSizeVolumetry - 1) /
+                              kBasicLauncherBlockSizeVolumetry;
+        const dim3 gridSize(length, length);
 
         diam_kernel(
-            numBlocks_diam,
-            threadsPerBlock_diam,
+            gridSize,
+            blockSize,
             vertices_dev,
-            num_vertices_actual,
+            vertex_count_host,
             diameters_sq_dev,
             max_possible_vertices
         );
 
         CUDA_CHECK_GOTO(cudaGetLastError(), cleanup);
         CUDA_CHECK_GOTO(cudaMemcpy(diameters_sq_host, diameters_sq_dev,
-                                4 * sizeof(double), cudaMemcpyDeviceToHost), cleanup);
+                            4 * sizeof(double), cudaMemcpyDeviceToHost), cleanup);
 
         diameters[0] = sqrt(diameters_sq_host[0]);
         diameters[1] = sqrt(diameters_sq_host[1]);
@@ -174,20 +175,29 @@ int basic_cuda_launcher(
 
     // --- 7. Cleanup: Free GPU memory ---
 cleanup:
-    if (mask_dev) CUDA_CHECK_EXIT(cudaFree(mask_dev));
-    if (size_dev) CUDA_CHECK_EXIT(cudaFree(size_dev));
-    if (strides_dev) CUDA_CHECK_EXIT(cudaFree(strides_dev));
-    if (spacing_dev) CUDA_CHECK_EXIT(cudaFree(spacing_dev));
-    if (surfaceArea_dev) CUDA_CHECK_EXIT(cudaFree(surfaceArea_dev));
-    if (volume_dev) CUDA_CHECK_EXIT(cudaFree(volume_dev));
-    if (vertices_dev) CUDA_CHECK_EXIT(cudaFree(vertices_dev));
-    if (vertex_count_dev) CUDA_CHECK_EXIT(cudaFree(vertex_count_dev));
-    if (diameters_sq_dev) CUDA_CHECK_EXIT(cudaFree(diameters_sq_dev));
+    if (mask_dev)
+        CUDA_CHECK_EXIT(cudaFree(mask_dev));
+    if (size_dev)
+        CUDA_CHECK_EXIT(cudaFree(size_dev));
+    if (strides_dev)
+        CUDA_CHECK_EXIT(cudaFree(strides_dev));
+    if (spacing_dev)
+        CUDA_CHECK_EXIT(cudaFree(spacing_dev));
+    if (surfaceArea_dev)
+        CUDA_CHECK_EXIT(cudaFree(surfaceArea_dev));
+    if (volume_dev)
+        CUDA_CHECK_EXIT(cudaFree(volume_dev));
+    if (vertices_dev)
+        CUDA_CHECK_EXIT(cudaFree(vertices_dev));
+    if (vertex_count_dev)
+        CUDA_CHECK_EXIT(cudaFree(vertex_count_dev));
+    if (diameters_sq_dev)
+        CUDA_CHECK_EXIT(cudaFree(diameters_sq_dev));
 
     return cudaStatus;
 }
 
-#define CUDA_BASIC_LAUNCH_SOLUTION(main_kernel, diam_kernel) \
+#define CUDA_SQUARE_LAUNCH_SOLUTION(main_kernel, diam_kernel) \
     CUDA_LAUNCH_SOLUTION(basic_cuda_launcher, main_kernel, diam_kernel)
 
-#endif //BASIC_LAUNCHER_CUH
+#endif //SQUARE_LAUNCHER_CUH

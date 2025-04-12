@@ -88,6 +88,12 @@ SOLUTION_DECL(1);
 SOLUTION_DECL(2);
 SOLUTION_DECL(3);
 SOLUTION_DECL(4);
+SOLUTION_DECL(5);
+SOLUTION_DECL(6);
+SOLUTION_DECL(7);
+SOLUTION_DECL(8);
+SOLUTION_DECL(9);
+SOLUTION_DECL(10);
 
 void RegisterSolutions() {
   REGISTER_SOLUTION(0, "Basic implementation");
@@ -95,5 +101,10 @@ void RegisterSolutions() {
   REGISTER_SOLUTION(2, "Added async data copy");
   REGISTER_SOLUTION(3, "Added simple shared memory");
   REGISTER_SOLUTION(4, "Less work for diameters");
-
+  REGISTER_SOLUTION(5, "SOA implementation");
+  REGISTER_SOLUTION(6, "SOA reduced atomics");
+  // REGISTER_SOLUTION(7, "CPU volumetry");
+  REGISTER_SOLUTION(8, "Reduced memory reads");
+  REGISTER_SOLUTION(9, "Reduced memory reads with no atomics");
+  REGISTER_SOLUTION(10, "Reduced memory reads - single dim");
 }

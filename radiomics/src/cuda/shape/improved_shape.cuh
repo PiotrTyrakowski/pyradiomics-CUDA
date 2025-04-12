@@ -1,7 +1,6 @@
 #ifndef IMPROVED_SHAPE_CUH
 #define IMPROVED_SHAPE_CUH
 
-
 #include "tables.cuh"
 #include <cstddef>
 

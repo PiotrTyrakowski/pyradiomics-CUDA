@@ -7,7 +7,8 @@ static __global__ void calculate_meshDiameter_kernel(
     const double
     *vertices, // Input: Array of vertex coordinates (x, y, z, x, y, z, ...)
     size_t num_vertices, // Input: Total number of valid vertices in the array
-    double *diameters_sq // Output: Array for squared max diameters [YZ, XZ, XY,
+    double *diameters_sq, // Output: Array for squared max diameters [YZ, XZ, XY,
+    [[maybe_unused]] size_t max_vertices
 ) {
     // Calculate global thread index
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
