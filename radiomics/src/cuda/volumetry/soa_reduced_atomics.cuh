@@ -31,9 +31,9 @@ static __global__ void calculate_meshDiameter_kernel(
     const double *y_table = vertices + (1 * max_vertices);
     const double *z_table = vertices + (2 * max_vertices);
 
-    double ax = x_table[tid];
-    double ay = y_table[tid];
-    double az = z_table[tid];
+    const double ax = x_table[tid];
+    const double ay = y_table[tid];
+    const double az = z_table[tid];
 
     double max_x = 0;
     double max_y = 0;
@@ -41,15 +41,15 @@ static __global__ void calculate_meshDiameter_kernel(
     double max_total = 0;
 
     for (size_t j = tid + 1; j < num_vertices; ++j) {
-        double bx = x_table[j];
-        double by = y_table[j];
-        double bz = z_table[j];
+        const double bx = x_table[j];
+        const double by = y_table[j];
+        const double bz = z_table[j];
 
-        double dx = ax - bx;
-        double dy = ay - by;
-        double dz = az - bz;
+        const double dx = ax - bx;
+        const double dy = ay - by;
+        const double dz = az - bz;
 
-        double dist_sq = dx * dx + dy * dy + dz * dz;
+        const double dist_sq = dx * dx + dy * dy + dz * dz;
 
         if (ax == bx) {
             max_x = max(max_x, dist_sq);

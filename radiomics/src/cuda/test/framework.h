@@ -34,7 +34,7 @@ typedef struct error_log {
     char *value;
 } error_log_t;
 
-#define MAX_ERROR_LOGS 32
+#define MAX_ERROR_LOGS 1024
 
 typedef struct test_result {
     char *function_name;
