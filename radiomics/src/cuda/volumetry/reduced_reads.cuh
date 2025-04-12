@@ -6,9 +6,9 @@
 
 static __global__ void calculate_meshDiameter_kernel(
     const double *vertices,
-    size_t num_vertices,
+    const size_t num_vertices,
     double *diameters_sq,
-    size_t max_vertices
+    const size_t max_vertices
 ) {
     /* Check if thread has nothing to do */
     const size_t own_data_idx = blockIdx.x * kBasicLauncherBlockSizeVolumetry + threadIdx.x;
@@ -69,7 +69,6 @@ static __global__ void calculate_meshDiameter_kernel(
                 atomicMax(&diameters_sq[2], dist_sq);
             }
         }
-
     } else {
         /* usual broadcast run */
 

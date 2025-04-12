@@ -92,6 +92,7 @@ SOLUTION_DECL(5);
 SOLUTION_DECL(6);
 SOLUTION_DECL(7);
 SOLUTION_DECL(8);
+SOLUTION_DECL(9);
 
 void RegisterSolutions() {
   REGISTER_SOLUTION(0, "Basic implementation");
@@ -103,4 +104,5 @@ void RegisterSolutions() {
   REGISTER_SOLUTION(6, "SOA reduced atomics");
   // REGISTER_SOLUTION(7, "CPU volumetry");
   REGISTER_SOLUTION(8, "Reduced memory reads");
+  REGISTER_SOLUTION(9, "Reduced memory reads with no atomics");
 }
