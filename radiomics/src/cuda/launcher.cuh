@@ -48,8 +48,8 @@
             ); \
         }, \
         []( \
-            int numBlocks_diam, \
-            int threadsPerBlock_diam, \
+            auto numBlocks_diam, \
+            auto threadsPerBlock_diam, \
             const double *vertices, \
             size_t num_vertices, \
             double *diameters_sq, \

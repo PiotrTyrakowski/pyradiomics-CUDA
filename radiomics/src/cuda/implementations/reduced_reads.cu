@@ -6,7 +6,7 @@
 // ------------------------------
 
 #include "shape/soa_shape.cuh"
-#include "volumetry/soa_reduced_atomics.cuh"
+#include "volumetry/reduced_reads.cuh"
 
 // ------------------------------
 // Host wrapper

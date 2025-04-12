@@ -102,5 +102,5 @@ void RegisterSolutions() {
   REGISTER_SOLUTION(5, "SOA implementation");
   REGISTER_SOLUTION(6, "SOA reduced atomics");
   // REGISTER_SOLUTION(7, "CPU volumetry");
-  REGISTER_SOLUTION(7, "Reduced memory reads");
+  REGISTER_SOLUTION(8, "Reduced memory reads");
 }
