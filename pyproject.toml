@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0", "numpy", "versioneer"]
+requires = ["setuptools>=61.0", "numpy", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyradiomics-cuda"
-version = "1.0.0"
+dynamic = ["version"]
 authors = [
     { name = "Piotr Tyrakowski", email = "verscup@gmail.com"},
     { name = "Jakub Lisowski", email = "Jlisowskyy@gmail.com"},
@@ -23,7 +23,6 @@ classifiers = [
     'Intended Audience :: Science/Research',
     'Operating System :: OS Independent',
     'Programming Language :: C',
-    'Programming Language :: CUDA',
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
@@ -53,3 +52,6 @@ pyradiomics = "radiomics.scripts.__init__:parse_args"
 [tool.setuptools]
 packages = ["radiomics", "radiomics.scripts"]
 include-package-data = true
+
+[tool.setuptools_scm]
+write_to = "radiomics/_version.py"

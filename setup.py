@@ -12,7 +12,7 @@ import numpy
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext as _build_ext
 
-import versioneer
+# import versioneer # Removed
 
 
 # -------------------------------
@@ -218,8 +218,9 @@ def attach_cuda_if_possible(extension, cuda_sources):
 if platform.architecture()[0].startswith('32'):
   raise Exception('PyRadiomics requires 64 bits python')
 
-commands = versioneer.get_cmdclass()
-commands['build_ext'] = CudaBuildExt
+# commands = versioneer.get_cmdclass() # Removed
+# commands['build_ext'] = CudaBuildExt # Modified below
+commands = {'build_ext': CudaBuildExt} # Initialize directly
 incDirs = [sysconfig.get_python_inc(), numpy.get_include()]
 
 ext = [
@@ -238,8 +239,8 @@ ext = [
 setup(
   name='pyradiomics-cuda',
 
-  version=versioneer.get_version(),
-  cmdclass=commands,
+  # version=versioneer.get_version(), # Removed - handled by setuptools_scm
+  cmdclass=commands, # Keep using the commands dict
 
   packages=['radiomics', 'radiomics.scripts'],
   ext_modules=ext,
