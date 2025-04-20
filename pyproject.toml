@@ -13,14 +13,14 @@ authors = [
 description = "CUDA-accelerated fork of PyRadiomics - a Radiomics features library for python"
 readme = "README.md"
 requires-python =">=3.5"
-license = { file = "LICENSE.txt"}
+license = "BSD-3-Clause"
+license-files = ["LICENSE.txt"]
 keywords = [ "radiomics", "cancerimaging", "medicalresearch", "computationalimaging", "cuda", "gpu" ]
 classifiers = [
     'Development Status :: 4 - Beta',
     'Environment :: Console',
     'Intended Audience :: Developers',
     'Intended Audience :: Science/Research',
-    'License :: OSI Approved :: BSD License',
     'Operating System :: OS Independent',
     'Programming Language :: C',
     'Programming Language :: CUDA',
@@ -49,3 +49,7 @@ pyradiomics = "radiomics.scripts.__init__:parse_args"
 "Documentation" = "https://pyradiomics.readthedocs.io/en/latest/index.html"
 "Docker" = "https://hub.docker.com/r/radiomics/pyradiomics/"
 "Github" = "https://github.com/AIM-Harvard/pyradiomics"
+
+[tool.setuptools]
+packages = ["radiomics", "radiomics.scripts"]
+include-package-data = true
