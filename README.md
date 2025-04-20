@@ -13,9 +13,26 @@ The CUDA acceleration focuses primarily on shape features calculation, which can
 - Same results and precision as the original implementation
 
 ### Requirements
-- CUDA Toolkit (tested with CUDA 11.x and 12.x)
+
+**Runtime Requirements:**
+
 - CUDA-compatible NVIDIA GPU
-- All the original PyRadiomics dependencies
+- NVIDIA CUDA Runtime libraries compatible with the toolkit used for compilation (tested with 12.x driver)
+- All the original PyRadiomics Python dependencies (numpy, SimpleITK, PyWavelets, pykwalify, six) - these will be installed automatically by pip.
+
+**Build Requirements (for installing from source):**
+
+Since this package includes C and CUDA extensions, installing from the source distribution (`.tar.gz`) requires compilation on your machine. You **must** have the following installed and configured **before** running `pip install pyradiomics-cuda`:
+
+- **A C Compiler:** Such as GCC on Linux, or Microsoft Visual C++ Build Tools on Windows.
+- **Python Development Headers:** Necessary for compiling C extensions.
+  - On Debian/Ubuntu: `sudo apt-get update && sudo apt-get install python3-dev`
+  - On Fedora/CentOS: `sudo yum update && sudo yum install python3-devel`
+  - On Windows: Usually included with Python installation or Visual Studio.
+- **NVIDIA CUDA Toolkit:** The full toolkit including the `nvcc` compiler is required. 
+  - Tested with CUDA Toolkit 12.x. 
+  - Ensure the CUDA installation directory (containing `nvcc`) is added to your system's `PATH` environment variable.
+- **GPU Compute Capability:** Your NVIDIA GPU must have a Compute Capability of 6.0 or higher due to the use of double-precision atomic operations.
 
 ### Installation
 

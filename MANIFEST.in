@@ -6,7 +6,7 @@ include requirements-dev.txt
 include requirements-setup.txt
 include versioneer.py
 
-recursive-include src/radiomics *
+recursive-include radiomics/src *.c *.h
 recursive-include radiomics/src/cuda *.cuh *.cu
 recursive-include radiomics/src/cuda/shape *.cuh
 recursive-include radiomics/src/cuda/volumetry *.cuh

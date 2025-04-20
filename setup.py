@@ -194,6 +194,10 @@ def attach_cuda_if_possible(extension, cuda_sources):
   if not nvcc_extra_args:
     nvcc_extra_args = ['-O3']
 
+  # Ensure compute capability 6.0+ for double precision atomics
+  if not any(arg.startswith('-arch=') for arg in nvcc_extra_args):
+    nvcc_extra_args.append('-arch=sm_60')
+
   cuda_include_dir = os.path.join('radiomics', 'src', 'cuda')
   extension.sources += cuda_sources
   extension.include_dirs += [cuda_include_dir]
