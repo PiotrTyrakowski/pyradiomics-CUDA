@@ -232,7 +232,7 @@ ext = [
 ]
 
 setup(
-  name='pyradiomics',
+  name='pyradiomics-cuda',
 
   version=versioneer.get_version(),
   cmdclass=commands,

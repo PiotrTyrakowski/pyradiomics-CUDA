@@ -1,3 +1,54 @@
+# pyradiomics-cuda v1.0.0
+
+## CUDA-Accelerated Fork
+
+This is a CUDA-accelerated fork of the original PyRadiomics package. It provides GPU acceleration for computationally intensive tasks, significantly improving performance when a CUDA-compatible GPU is available.
+
+### Performance Benefits
+
+The CUDA acceleration focuses primarily on shape features calculation, which can be computationally expensive in the original PyRadiomics, especially for complex 3D volumes. Depending on your hardware and the size of your datasets, you can expect:
+
+- Up to 10-50x speedup on shape feature computation with a modern NVIDIA GPU
+- Automatic fallback to CPU when CUDA is not available
+- Same results and precision as the original implementation
+
+### Requirements
+- CUDA Toolkit (tested with CUDA 11.x and 12.x)
+- CUDA-compatible NVIDIA GPU
+- All the original PyRadiomics dependencies
+
+### Installation
+
+```bash
+pip install pyradiomics-cuda
+```
+
+If you want to disable CUDA extensions during installation, use:
+
+```bash
+DISABLE_CUDA_EXTENSIONS=1 pip install pyradiomics-cuda
+```
+
+### Usage
+
+This package can be used exactly the same way as the original PyRadiomics, but will automatically use GPU acceleration when a compatible CUDA device is available:
+
+```python
+import radiomics
+from radiomics import featureextractor
+
+# The usage is identical to the original PyRadiomics
+extractor = featureextractor.RadiomicsFeatureExtractor()
+result = extractor.execute(imageFilepath, maskFilepath)
+```
+
+### Authors
+
+- Piotr Tyrakowski ([@PiotrTyrakowski](https://github.com/PiotrTyrakowski))
+- Jakub Lisowski ([@Jlisowskyy](https://github.com/Jlisowskyy))
+
+## Original PyRadiomics Information
+
 # pyradiomics v3.1.0
 
 ## Build Status

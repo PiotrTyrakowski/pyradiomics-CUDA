@@ -3,24 +3,27 @@ requires = ["setuptools>=61.0", "numpy", "versioneer"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pyradiomics"
-version = "3.1.1"
+name = "pyradiomics-cuda"
+version = "1.0.0"
 authors = [
+    { name = "Piotr Tyrakowski", email = "verscup@gmail.com"},
+    { name = "Jakub Lisowski", email = "Jlisowskyy@gmail.com"},
     { name = "PyRadiomics Community", email = "pyradiomics@googlegroups.com"}
 ]
-description = "Radiomics features library for python"
+description = "CUDA-accelerated fork of PyRadiomics - a Radiomics features library for python"
 readme = "README.md"
 requires-python =">=3.5"
 license = { file = "LICENSE.txt"}
-keywords = [ "radiomics", "cancerimaging", "medicalresearch", "computationalimaging" ]
+keywords = [ "radiomics", "cancerimaging", "medicalresearch", "computationalimaging", "cuda", "gpu" ]
 classifiers = [
-    'Development Status :: 5 - Production/Stable',
+    'Development Status :: 4 - Beta',
     'Environment :: Console',
     'Intended Audience :: Developers',
     'Intended Audience :: Science/Research',
     'License :: OSI Approved :: BSD License',
     'Operating System :: OS Independent',
     'Programming Language :: C',
+    'Programming Language :: CUDA',
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
@@ -40,7 +43,8 @@ dependencies = [
 pyradiomics = "radiomics.scripts.__init__:parse_args"
 
 [project.urls]
-"Homepaget" = "http://github.com/AIM-Harvard/pyradiomics#readme"
+"Homepage" = "https://github.com/PiotrTyrakowski/pyradiomics-CUDA"
+"Original PyRadiomics" = "http://github.com/AIM-Harvard/pyradiomics#readme"
 "Radiomics.io" = "https://www.radiomics.io/"
 "Documentation" = "https://pyradiomics.readthedocs.io/en/latest/index.html"
 "Docker" = "https://hub.docker.com/r/radiomics/pyradiomics/"

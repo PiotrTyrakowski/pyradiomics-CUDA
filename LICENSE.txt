@@ -1,4 +1,5 @@
-Copyright 2017 Harvard Medical School
+Copyright 2023-2024 Piotr Tyrakowski, Jakub Lisowski - CUDA extensions and modifications
+Copyright 2017 Harvard Medical School - Original PyRadiomics
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
 following conditions are met:
