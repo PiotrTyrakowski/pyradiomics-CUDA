@@ -11,6 +11,7 @@ recursive-include radiomics/src/cuda *.cuh *.cu
 recursive-include radiomics/src/cuda/shape *.cuh
 recursive-include radiomics/src/cuda/volumetry *.cuh
 recursive-include radiomics/src/cuda/implementations *.cu
+recursive-include radiomics/src/cuda/test *.hpp *.c *.h
 
 recursive-include data/baseline *
 recursive-include data *_image.nrrd
