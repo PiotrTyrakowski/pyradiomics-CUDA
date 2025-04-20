@@ -23,7 +23,6 @@ def deprecated(func):
   func._is_deprecated = True
   return func
 
-
 def setVerbosity(level):
   """
   Change the amount of information PyRadiomics should print out during extraction. The lower the level, the more

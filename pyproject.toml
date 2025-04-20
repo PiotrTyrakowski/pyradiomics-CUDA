@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyradiomics-cuda"
-dynamic = ["version"]
+version = "1.0.2"
 authors = [
     { name = "Piotr Tyrakowski", email = "verscup@gmail.com"},
     { name = "Jakub Lisowski", email = "Jlisowskyy@gmail.com"},
@@ -13,8 +13,7 @@ authors = [
 description = "CUDA-accelerated fork of PyRadiomics - a Radiomics features library for python"
 readme = "README.md"
 requires-python =">=3.5"
-license = "BSD-3-Clause"
-license-files = ["LICENSE.txt"]
+license = { file = "LICENSE.txt" }
 keywords = [ "radiomics", "cancerimaging", "medicalresearch", "computationalimaging", "cuda", "gpu" ]
 classifiers = [
     'Development Status :: 4 - Beta',
@@ -49,9 +48,3 @@ pyradiomics = "radiomics.scripts.__init__:parse_args"
 "Docker" = "https://hub.docker.com/r/radiomics/pyradiomics/"
 "Github" = "https://github.com/AIM-Harvard/pyradiomics"
 
-[tool.setuptools]
-packages = ["radiomics", "radiomics.scripts"]
-include-package-data = true
-
-[tool.setuptools_scm]
-write_to = "radiomics/_version.py"

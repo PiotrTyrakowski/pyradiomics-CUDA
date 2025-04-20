@@ -1,8 +1,10 @@
-# pyradiomics-cuda v1.0.0
+# pyradiomics-cuda v1.0.2
 
 ## CUDA-Accelerated Fork
 
-This is a CUDA-accelerated fork of the original PyRadiomics package. It provides GPU acceleration for computationally intensive tasks, significantly improving performance when a CUDA-compatible GPU is available.
+This is a CUDA-accelerated fork of the original [PyRadiomics package](https://github.com/AIM-Harvard/pyradiomics) (based on version 3.0.1). It provides GPU acceleration for computationally intensive tasks, significantly improving performance when a CUDA-compatible GPU is available.
+
+This fork is distributed under the 3-clause BSD license (see LICENSE file).
 
 ### Performance Benefits
 
@@ -66,6 +68,8 @@ result = extractor.execute(imageFilepath, maskFilepath)
 
 ## Original PyRadiomics Information
 
+**Note:** The following information pertains to the original `pyradiomics` package. Some details, particularly regarding installation, Docker images, and build status, may differ for this CUDA-accelerated fork.
+
 # pyradiomics v3.1.0
 
 ## Build Status
@@ -100,7 +104,9 @@ Phenotype. Cancer Research, 77(21), e104–e107. https://doi.org/10.1158/0008-54
 
 ### Join the Community!
 
-Please join the [Radiomics community section of the 3D Slicer Discourse](https://discourse.slicer.org/c/community/radiomics/23).
+For questions specifically about this **CUDA fork**, please use the [GitHub Issues](https://github.com/PiotrTyrakowski/pyradiomics-CUDA/issues) for this repository.
+
+For general questions about **PyRadiomics concepts or the original package**, please join the [Radiomics community section of the 3D Slicer Discourse](https://discourse.slicer.org/c/community/radiomics/23).
 
 ### Feature Classes
 Currently supports the following feature classes:
@@ -152,6 +158,9 @@ Detailed installation instructions, as well as instructions for building PyRadio
 [documentation](http://pyradiomics.readthedocs.io/en/latest/installation.html).
 
 ### Docker
+
+**Note:** The following Docker images are for the **original `pyradiomics` package** and **do not** include the CUDA accelerations from this fork.
+
 PyRadiomics also supports [Dockers](https://www.docker.com/).  Currently, 2 dockers are available:
 
 The first one is a [Jupyter notebook](http://jupyter.org/) with PyRadiomics pre-installed with example Notebooks. 
@@ -224,7 +233,10 @@ This package is covered by the open source [3-clause BSD License](LICENSE.txt).
 <sup>6</sup>Isomics
 
 ### Contact
-We are happy to help you with any questions. Please contact us on the [Radiomics community section of the 3D Slicer Discourse](https://discourse.slicer.org/c/community/radiomics/23).
+
+We are happy to help you with any questions. 
+- For questions about this **CUDA fork**, please use the [GitHub Issues](https://github.com/PiotrTyrakowski/pyradiomics-CUDA/issues).
+- For general **PyRadiomics** questions, please use the [Radiomics community section of the 3D Slicer Discourse](https://discourse.slicer.org/c/community/radiomics/23).
 
 We welcome contributions to PyRadiomics. Please read the [contributing guidelines](CONTRIBUTING.rst) on how to
 contribute to PyRadiomics.
