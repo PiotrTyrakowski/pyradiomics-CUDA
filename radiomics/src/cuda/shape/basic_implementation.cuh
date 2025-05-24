@@ -101,9 +101,12 @@ static __global__ void calculate_coefficients_kernel(
                 vertices[write_idx * 3 + 1] = new_vertices_local[v * 3 + 1];
                 vertices[write_idx * 3 + 2] = new_vertices_local[v * 3 + 2];
             }
+        } else {
+            // If overflow occurs, the vertex_count will exceed max_vertices, handled in
+            // host code.
+
+            return;
         }
-        // If overflow occurs, the vertex_count will exceed max_vertices, handled in
-        // host code.
     }
 
     // --- Process Triangles for Surface Area and Volume ---

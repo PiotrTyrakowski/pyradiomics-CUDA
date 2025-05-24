@@ -92,6 +92,13 @@ static __global__ void calculate_coefficients_kernel(
         unsigned long long start_v_idx =
                 atomicAdd(vertex_count, (unsigned long long) num_new_vertices);
 
+        if (start_v_idx + num_new_vertices >= max_vertices) {
+            // If overflow occurs, the vertex_count will exceed max_vertices, handled in
+            // host code.
+
+            return;
+        }
+
         double* p_table = vertices + start_v_idx * 3;
 
         // Check bit 6 (original point p6, edge 6) using potentially flipped cube_idx
