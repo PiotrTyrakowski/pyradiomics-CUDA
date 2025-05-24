@@ -68,12 +68,12 @@ static __global__ void calculate_meshDiameter_kernel(
         if (ax == bx) max_x = max(max_x, dist_sq);
         if (ay == by) max_y = max(max_y, dist_sq);
         if (az == bz) max_z = max(max_z, dist_sq);
-        max_total = max_total + dist_sq;
+        max_total = max(max_total, dist_sq);
     }
 
-    atomicMax(&diameters_sq[0], max_x);
+    atomicMax(&diameters_sq[2], max_x);
     atomicMax(&diameters_sq[1], max_y);
-    atomicMax(&diameters_sq[2], max_z);
+    atomicMax(&diameters_sq[0], max_z);
     atomicMax(&diameters_sq[3], max_total);
 }
 

@@ -87,11 +87,11 @@ static __global__ void calculate_meshDiameter_kernel(
     // Final result update
     if (threadIdx.x == 0) {
         atomicMax(reinterpret_cast<unsigned long long *>(&diameters_sq[0]),
-                  *reinterpret_cast<unsigned long long *>(&s_diameter_x[0]));
+                  *reinterpret_cast<unsigned long long *>(&s_diameter_z[0]));
         atomicMax(reinterpret_cast<unsigned long long *>(&diameters_sq[1]),
                *reinterpret_cast<unsigned long long *>(&s_diameter_y[0]));
         atomicMax(reinterpret_cast<unsigned long long *>(&diameters_sq[2]),
-               *reinterpret_cast<unsigned long long *>(&s_diameter_z[0]));
+               *reinterpret_cast<unsigned long long *>(&s_diameter_x[0]));
         atomicMax(reinterpret_cast<unsigned long long *>(&diameters_sq[3]),
                *reinterpret_cast<unsigned long long *>(&s_diameter_total[0]));
     }

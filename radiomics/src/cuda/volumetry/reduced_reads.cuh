@@ -84,13 +84,13 @@ static __global__ void calculate_meshDiameter_kernel(
             const double dist_sq = dx * dx + dy * dy + dz * dz;
             atomicMax(&diameters_sq[3], dist_sq);
             if (ax == bx) {
-                atomicMax(&diameters_sq[0], dist_sq);
+                atomicMax(&diameters_sq[2], dist_sq);
             }
             if (ay == by) {
                 atomicMax(&diameters_sq[1], dist_sq);
             }
             if (az == bz) {
-                atomicMax(&diameters_sq[2], dist_sq);
+                atomicMax(&diameters_sq[0], dist_sq);
             }
         }
     }

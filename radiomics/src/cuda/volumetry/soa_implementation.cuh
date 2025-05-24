@@ -37,7 +37,7 @@ static __global__ void calculate_meshDiameter_kernel(
 
         if (ax == bx) {
             // If x-coordinates are equal (lies in a YZ plane)
-            atomicMax(&diameters_sq[0], dist_sq);
+            atomicMax(&diameters_sq[2], dist_sq);
         }
         if (ay == by) {
             // If y-coordinates are equal (lies in an XZ plane)
@@ -45,7 +45,7 @@ static __global__ void calculate_meshDiameter_kernel(
         }
         if (az == bz) {
             // If z-coordinates are equal (lies in an XY plane)
-            atomicMax(&diameters_sq[2], dist_sq);
+            atomicMax(&diameters_sq[0], dist_sq);
         }
     }
 }
