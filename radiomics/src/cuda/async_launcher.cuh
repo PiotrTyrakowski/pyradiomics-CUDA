@@ -139,6 +139,12 @@ int async_cuda_launcher(
     END_MEASUREMENT(0);
     START_MEASUREMENT(1, "Async launcher diameter stage");
 
+    // Check if vertex buffer might have overflowed
+    if (*vertex_count_host > max_possible_vertices) {
+        cudaStatus = cudaErrorUnknown;
+        goto cleanup;
+    }
+
     // Launch diameter kernel only if vertices were generated
     if (*vertex_count_host > 0) {
         size_t num_vertices_actual = (size_t) *vertex_count_host;
@@ -202,7 +208,7 @@ cleanup:
 
     END_MEASUREMENT(1);
 
-    return cudaStatus;
+    return cudaStatus == cudaSuccess ? 0 : 1;
 }
 
 #define CUDA_ASYNC_LAUNCH_SOLUTION(main_kernel, diam_kernel) \

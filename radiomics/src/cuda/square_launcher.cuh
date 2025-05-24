@@ -130,12 +130,8 @@ int basic_cuda_launcher(
 
     // Check if vertex buffer might have overflowed
     if (vertex_count_host > max_possible_vertices) {
-        fprintf(stderr,
-                "Warning: CUDA vertex buffer potentially overflowed (3D). Needed: "
-                "%llu, Allocated: %llu. Diameter results might be based on "
-                "incomplete data.\n",
-                vertex_count_host, (unsigned long long) max_possible_vertices);
-        vertex_count_host = max_possible_vertices;
+        cudaStatus = cudaErrorUnknown;
+        goto cleanup;
     }
 
     START_MEASUREMENT(2, "Volumetric Kernel");
@@ -194,7 +190,7 @@ cleanup:
     if (diameters_sq_dev)
         CUDA_CHECK_EXIT(cudaFree(diameters_sq_dev));
 
-    return cudaStatus;
+    return cudaStatus == cudaSuccess ? 0 : 1;
 }
 
 #define CUDA_SQUARE_LAUNCH_SOLUTION(main_kernel, diam_kernel) \
