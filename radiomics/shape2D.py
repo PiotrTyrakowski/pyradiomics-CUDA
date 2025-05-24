@@ -48,7 +48,6 @@ class RadiomicsShape2D(base.RadiomicsFeaturesBase):
   def __init__(self, inputImage, inputMask, **kwargs):
     super(RadiomicsShape2D, self).__init__(inputImage, inputMask, **kwargs)
 
-
   def _initVoxelBasedCalculation(self):
     raise NotImplementedError('Shape features are not available in pixel-based mode')
 
@@ -85,15 +84,13 @@ class RadiomicsShape2D(base.RadiomicsFeaturesBase):
     self.logger.debug('Pre-calculate surface, perimeter, diameter and eigenvalues')
 
     # Volume, Surface Area and eigenvalues are pre-calculated
-
-    # Ensure correct types and C-contiguity for C extension
     maskArray_int8 = self.maskArray.astype(numpy.int8)
     maskArray_copy = maskArray_int8.copy(order='C')
 
     pixelSpacing_float64 = self.pixelSpacing.astype(numpy.float64)
     pixelSpacing_copy = pixelSpacing_float64.copy(order='C')
 
-    # Compute Surface Area and perimeter using the C-ordered copies
+    # Compute Surface Area and volume
     self.Perimeter, self.Surface, self.Diameter = cShape.calculate_coefficients2D(maskArray_copy, pixelSpacing_copy)
 
     # Compute eigenvalues and -vectors

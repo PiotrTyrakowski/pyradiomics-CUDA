@@ -436,7 +436,6 @@ class RadiomicsFeatureExtractor:
     def compute(shape_type):
       logger.info('Computing %s', shape_type)
       featureNames = enabledFeatures[shape_type]
-
       shapeClass = getFeatureClasses()[shape_type](croppedImage, croppedMask, **kwargs)
 
       if featureNames is not None:

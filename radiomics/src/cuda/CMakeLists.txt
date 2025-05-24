@@ -5,6 +5,56 @@ set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_C_STANDARD 17)
 
 # ------------------------------
+# Find Python and NumPy (Virtual Environment Priority)
+# ------------------------------
+
+# Check for virtual environment first
+if(DEFINED ENV{VIRTUAL_ENV})
+    message(STATUS "Virtual environment detected: $ENV{VIRTUAL_ENV}")
+    set(Python3_ROOT_DIR "$ENV{VIRTUAL_ENV}")
+    set(Python3_FIND_VIRTUALENV FIRST)
+else()
+    message(STATUS "No virtual environment detected, using system Python")
+    set(Python3_FIND_VIRTUALENV STANDARD)
+endif()
+
+set(Python3_FIND_STRATEGY LOCATION)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
+
+get_filename_component(PYTHON_DIR ${Python3_EXECUTABLE} DIRECTORY)
+if(DEFINED ENV{VIRTUAL_ENV})
+    get_filename_component(VENV_BIN_DIR "$ENV{VIRTUAL_ENV}/bin" ABSOLUTE)
+    get_filename_component(VENV_SCRIPTS_DIR "$ENV{VIRTUAL_ENV}/Scripts" ABSOLUTE)
+    if(NOT (PYTHON_DIR STREQUAL VENV_BIN_DIR OR PYTHON_DIR STREQUAL VENV_SCRIPTS_DIR))
+        message(WARNING "Python executable may not be from the active virtual environment!")
+        message(STATUS "Expected: ${VENV_BIN_DIR} or ${VENV_SCRIPTS_DIR}")
+        message(STATUS "Found: ${PYTHON_DIR}")
+    endif()
+elseif(DEFINED ENV{CONDA_PREFIX})
+    get_filename_component(CONDA_BIN_DIR "$ENV{CONDA_PREFIX}/bin" ABSOLUTE)
+    get_filename_component(CONDA_SCRIPTS_DIR "$ENV{CONDA_PREFIX}/Scripts" ABSOLUTE)
+    if(NOT (PYTHON_DIR STREQUAL CONDA_BIN_DIR OR PYTHON_DIR STREQUAL CONDA_SCRIPTS_DIR))
+        message(WARNING "Python executable may not be from the active conda environment!")
+        message(STATUS "Expected: ${CONDA_BIN_DIR} or ${CONDA_SCRIPTS_DIR}")
+        message(STATUS "Found: ${PYTHON_DIR}")
+    endif()
+endif()
+
+message(STATUS "Python3 found: ${Python3_FOUND}")
+message(STATUS "Python3 executable: ${Python3_EXECUTABLE}")
+message(STATUS "Python3 include dirs: ${Python3_INCLUDE_DIRS}")
+message(STATUS "Python3 libraries: ${Python3_LIBRARIES}")
+message(STATUS "Python3 NumPy include dirs: ${Python3_NumPy_INCLUDE_DIRS}")
+
+if(NOT Python3_Development_FOUND)
+    message(FATAL_ERROR "Python3 development headers not found. Install python3-dev or python3-devel package.")
+endif()
+
+if(NOT Python3_NumPy_FOUND)
+    message(FATAL_ERROR "NumPy headers not found. Install numpy package.")
+endif()
+
+# ------------------------------
 # Cuda sources
 # ------------------------------
 
@@ -14,7 +64,7 @@ file(GLOB_RECURSE CUDA_SOURCES
 
 add_library(CUDA_LIB STATIC ${CUDA_SOURCES})
 
-set_property(TARGET CUDA_LIB PROPERTY CUDA_ARCHITECTURES 60)
+set_property(TARGET CUDA_LIB PROPERTY CUDA_ARCHITECTURES 90)
 
 target_include_directories(CUDA_LIB PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(CUDA_LIB PRIVATE ENABLE_TIME_MEASUREMENT)
@@ -29,103 +79,13 @@ file(GLOB PYRADIOMICS_C
 
 add_library(PYRADIOMICS STATIC ${PYRADIOMICS_C})
 
-target_include_directories(PYRADIOMICS PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../")
-
-# ------------------------------
-# Find Python
-# ------------------------------
-
-# Check if .venv directory exists in the project root
-if(EXISTS "${CMAKE_SOURCE_DIR}/../../../.venv")
-    # Use Python from the virtual environment
-    set(PYTHON_EXECUTABLE "${CMAKE_SOURCE_DIR}/../../../.venv/bin/python")
-    if(WIN32)
-        set(PYTHON_EXECUTABLE "${CMAKE_SOURCE_DIR}/../../../.venv/Scripts/python.exe")
-    endif()
-    message(STATUS "Using Python from virtual environment: ${PYTHON_EXECUTABLE}")
-else()
-    # Find system Python
-    find_package(Python3 REQUIRED COMPONENTS Development)
-    set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
-    message(STATUS "Using system Python: ${PYTHON_EXECUTABLE}")
-endif()
-
-# Find Python development libraries
-if(NOT DEFINED Python3_INCLUDE_DIRS OR NOT DEFINED Python3_LIBRARIES)
-    # Get Python include directory
-    execute_process(
-        COMMAND ${PYTHON_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_path('include'))"
-        OUTPUT_VARIABLE Python3_INCLUDE_DIRS
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    
-    # Get Python version for library naming
-    execute_process(
-        COMMAND ${PYTHON_EXECUTABLE} -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-        OUTPUT_VARIABLE PYTHON_VERSION
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    
-    # Get Python library path directly 
-    execute_process(
-        COMMAND ${PYTHON_EXECUTABLE} -c "import sysconfig; import os; print(os.path.join(sysconfig.get_config_var('LIBDIR'), sysconfig.get_config_var('LDLIBRARY') or f'libpython{sysconfig.get_config_var(\"VERSION\")}{sysconfig.get_config_var(\"ABIFLAGS\")}.so'))"
-        OUTPUT_VARIABLE Python3_LIBRARIES
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    
-    # Check if file exists
-    if(NOT EXISTS "${Python3_LIBRARIES}")
-        message(WARNING "Python library not found at ${Python3_LIBRARIES}, trying alternative approach")
-        
-        # Try to find the library in standard locations
-        execute_process(
-            COMMAND ${PYTHON_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR'))"
-            OUTPUT_VARIABLE Python3_LIBRARY_DIR
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-        )
-        
-        find_library(Python3_LIBRARIES 
-                    NAMES python${PYTHON_VERSION} python${PYTHON_VERSION}m libpython${PYTHON_VERSION} libpython${PYTHON_VERSION}m
-                    PATHS ${Python3_LIBRARY_DIR}
-                    PATH_SUFFIXES lib lib64
-                    NO_DEFAULT_PATH)
-                    
-        if(NOT Python3_LIBRARIES)
-            # Last resort: search in the virtual environment
-            find_library(Python3_LIBRARIES 
-                        NAMES python${PYTHON_VERSION} python${PYTHON_VERSION}m libpython${PYTHON_VERSION} libpython${PYTHON_VERSION}m
-                        PATHS "${CMAKE_SOURCE_DIR}/../../../.venv"
-                        PATH_SUFFIXES lib lib64
-                        NO_DEFAULT_PATH)
-        endif()
-    endif()
-    
-    if(NOT Python3_LIBRARIES)
-        message(FATAL_ERROR "Python libraries not found. Please specify Python3_LIBRARIES manually.")
-    endif()
-    
-    message(STATUS "Found Python include dirs: ${Python3_INCLUDE_DIRS}")
-    message(STATUS "Found Python libraries: ${Python3_LIBRARIES}")
-endif()
-
-target_include_directories(PYRADIOMICS PRIVATE ${Python3_INCLUDE_DIRS})
-target_link_libraries(PYRADIOMICS PRIVATE ${Python3_LIBRARIES})
-
-# ------------------------------
-# Numpy
-# ------------------------------
-
-execute_process(
-        COMMAND ${PYTHON_EXECUTABLE} -c "import numpy; print(numpy.get_include())"
-        OUTPUT_VARIABLE NUMPY_INCLUDE_DIR
-        OUTPUT_STRIP_TRAILING_WHITESPACE
+target_include_directories(PYRADIOMICS PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/../"
+        ${Python3_INCLUDE_DIRS}
+        ${Python3_NumPy_INCLUDE_DIRS}
 )
 
-if (NOT NUMPY_INCLUDE_DIR)
-    message(FATAL_ERROR "NumPy include directory not found")
-endif ()
-
-message(STATUS "NumPy include directory: ${NUMPY_INCLUDE_DIR}")
+target_link_libraries(PYRADIOMICS PRIVATE ${Python3_LIBRARIES})
 
 # ------------------------------
 # C test application
@@ -137,20 +97,17 @@ file(GLOB_RECURSE C_SOURCES
 
 add_executable(TEST_APP ${C_SOURCES})
 
-target_include_directories(TEST_APP PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/test")
+target_include_directories(TEST_APP PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/test"
+        ${Python3_INCLUDE_DIRS}
+        ${Python3_NumPy_INCLUDE_DIRS}
+)
 
 target_link_libraries(TEST_APP PRIVATE
         CUDA_LIB
         PYRADIOMICS
+        ${Python3_LIBRARIES}
 )
-
-target_include_directories(TEST_APP PRIVATE
-        ${Python3_INCLUDE_DIRS}
-        ${NUMPY_INCLUDE_DIR}
-)
-
-target_link_libraries(TEST_APP PRIVATE ${Python3_LIBRARIES})
-
 
 # ------------------------------
 # Flags config
@@ -192,4 +149,3 @@ else ()
     )
 
 endif ()
-

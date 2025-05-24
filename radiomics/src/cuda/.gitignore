@@ -1,5 +1,4 @@
 data
-build/*
-!build/.gitkeep
+build
 out.txt
 cmake*
