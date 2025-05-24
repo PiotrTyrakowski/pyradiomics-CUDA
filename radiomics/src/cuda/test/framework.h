@@ -27,7 +27,7 @@ typedef struct time_measurement {
     uint32_t retries;
 } time_measurement_t;
 
-#define MAX_MEASUREMENTS 32
+#define MAX_MEASUREMENTS 256
 
 typedef struct error_log {
     const char *name;

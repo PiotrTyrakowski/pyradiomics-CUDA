@@ -352,7 +352,7 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
             continue;
         }
 
-        fprintf(file, "Function %lu: %s\n", i + 1, g_ShapeFunctionNames[i]);
+        fprintf(file, "Function %lu: %s\n", i, g_ShapeFunctionNames[i]);
     }
     fprintf(file, "\n");
 

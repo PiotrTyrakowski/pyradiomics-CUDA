@@ -30,14 +30,6 @@ if(DEFINED ENV{VIRTUAL_ENV})
         message(STATUS "Expected: ${VENV_BIN_DIR} or ${VENV_SCRIPTS_DIR}")
         message(STATUS "Found: ${PYTHON_DIR}")
     endif()
-elseif(DEFINED ENV{CONDA_PREFIX})
-    get_filename_component(CONDA_BIN_DIR "$ENV{CONDA_PREFIX}/bin" ABSOLUTE)
-    get_filename_component(CONDA_SCRIPTS_DIR "$ENV{CONDA_PREFIX}/Scripts" ABSOLUTE)
-    if(NOT (PYTHON_DIR STREQUAL CONDA_BIN_DIR OR PYTHON_DIR STREQUAL CONDA_SCRIPTS_DIR))
-        message(WARNING "Python executable may not be from the active conda environment!")
-        message(STATUS "Expected: ${CONDA_BIN_DIR} or ${CONDA_SCRIPTS_DIR}")
-        message(STATUS "Found: ${PYTHON_DIR}")
-    endif()
 endif()
 
 message(STATUS "Python3 found: ${Python3_FOUND}")
@@ -64,7 +56,7 @@ file(GLOB_RECURSE CUDA_SOURCES
 
 add_library(CUDA_LIB STATIC ${CUDA_SOURCES})
 
-set_property(TARGET CUDA_LIB PROPERTY CUDA_ARCHITECTURES 90)
+set_property(TARGET CUDA_LIB PROPERTY CUDA_ARCHITECTURES 60)
 
 target_include_directories(CUDA_LIB PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(CUDA_LIB PRIVATE ENABLE_TIME_MEASUREMENT)
