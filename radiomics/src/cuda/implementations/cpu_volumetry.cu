@@ -160,7 +160,6 @@ int basic_cuda_launcher(
     }
 
     /* copy back to cpu */
-
     START_MEASUREMENT(2, "Volumetric Kernel");
     if (vertex_count_host > 0) {
         size_t vertices_to_copy = vertex_count_host * 3 * sizeof(double);
