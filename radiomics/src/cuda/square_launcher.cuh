@@ -39,18 +39,6 @@ int basic_cuda_launcher(
     unsigned long long vertex_count_host = 0;
     double diameters_sq_host[4] = {0.0, 0.0, 0.0, 0.0};
 
-    // --- Recalculate Host Strides (Assuming C-contiguous char mask) ---
-    int calculated_strides_host[3];
-    calculated_strides_host[2] =
-            sizeof(char); // Stride for the last dimension (ix)
-    calculated_strides_host[1] =
-            size[2] *
-            calculated_strides_host[2]; // Stride for the middle dimension (iy)
-    calculated_strides_host[0] =
-            size[1] *
-            calculated_strides_host[1]; // Stride for the first dimension (iz)
-    // --- End Recalculation ---
-
     // --- Determine Allocation Sizes ---
     size_t mask_elements = (size_t) size[0] * size[1] * size[2];
     size_t mask_size_bytes = mask_elements * sizeof(char);
@@ -80,7 +68,7 @@ int basic_cuda_launcher(
     // --- 3. Copy Input Data from Host to Device ---
     CUDA_CHECK_GOTO(cudaMemcpy(mask_dev, mask, mask_size_bytes, cudaMemcpyHostToDevice), cleanup);
     CUDA_CHECK_GOTO(cudaMemcpy(size_dev, size, 3 * sizeof(int), cudaMemcpyHostToDevice), cleanup);
-    CUDA_CHECK_GOTO(cudaMemcpy(strides_dev, calculated_strides_host, 3 * sizeof(int),
+    CUDA_CHECK_GOTO(cudaMemcpy(strides_dev, strides, 3 * sizeof(int),
                         cudaMemcpyHostToDevice), cleanup);
     CUDA_CHECK_GOTO(cudaMemcpy(spacing_dev, spacing, 3 * sizeof(double),
                         cudaMemcpyHostToDevice), cleanup);
