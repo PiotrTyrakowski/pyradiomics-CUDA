@@ -3,6 +3,8 @@
 
 #include <constants.cuh>
 #include <stdio.h>
+#include <algorithm>
+#include <cmath>
 #include "launcher.cuh"
 #include "test/inline_measurment.hpp"
 
@@ -10,28 +12,28 @@ template<class MainKernel, class DiameterKernel>
 int basic_cuda_launcher(
     MainKernel &&main_kernel,
     DiameterKernel &&diam_kernel,
-    char *mask,
-    int *size,
-    int *strides,
-    double *spacing,
-    double *surfaceArea,
-    double *volume,
-    double *diameters
+    const char* const mask,
+    const int* const size,
+    const int* const strides,
+    const double* const spacing,
+    double* const surfaceArea,
+    double* const volume,
+    double* const diameters
 ) {
     cudaError_t cudaStatus = cudaSuccess;
 
     START_MEASUREMENT(0, "Data transfer");
 
     // --- Device Memory Pointers ---
-    char *mask_dev = NULL;
-    int *size_dev = NULL;
-    int *strides_dev = NULL;
-    double *spacing_dev = NULL;
-    double *surfaceArea_dev = NULL;
-    double *volume_dev = NULL;
-    double *vertices_dev = NULL;
-    unsigned long long *vertex_count_dev = NULL;
-    double *diameters_sq_dev = NULL;
+    char *mask_dev = nullptr;
+    int *size_dev = nullptr;
+    int *strides_dev = nullptr;
+    double *spacing_dev = nullptr;
+    double *surfaceArea_dev = nullptr;
+    double *volume_dev = nullptr;
+    double *vertices_dev = nullptr;
+    unsigned long long *vertex_count_dev = nullptr;
+    double *diameters_sq_dev = nullptr;
 
     // --- Host-side Accumulators/Temporaries ---
     double surfaceArea_host = 0.0;
@@ -40,24 +42,22 @@ int basic_cuda_launcher(
     double diameters_sq_host[4] = {0.0, 0.0, 0.0, 0.0};
 
     // --- Determine Allocation Sizes ---
-    size_t mask_elements = (size_t) size[0] * size[1] * size[2];
-    size_t mask_size_bytes = mask_elements * sizeof(char);
-    size_t num_cubes = (size_t) (size[0] - 1) * (size[1] - 1) * (size[2] - 1);
-    size_t max_possible_vertices = num_cubes * 3;
-    if (max_possible_vertices == 0)
-        max_possible_vertices = 1;
-    size_t vertices_bytes = max_possible_vertices * 3 * sizeof(double);
+    const size_t mask_elements = static_cast<size_t>(size[0]) * size[1] * size[2];
+    const size_t mask_size_bytes = mask_elements * sizeof(char);
+    const size_t num_cubes = static_cast<size_t>(size[0] - 1) * (size[1] - 1) * (size[2] - 1);
+    const size_t max_possible_vertices = (num_cubes == 0) ? 1 : num_cubes * 3;
+    const size_t vertices_bytes = max_possible_vertices * 3 * sizeof(double);
 
     // --- 1. Allocate GPU Memory ---
-    CUDA_CHECK_GOTO(cudaMalloc((void **) &mask_dev, mask_size_bytes), cleanup);
-    CUDA_CHECK_GOTO(cudaMalloc((void **) &size_dev, 3 * sizeof(int)), cleanup);
-    CUDA_CHECK_GOTO(cudaMalloc((void **) &strides_dev, 3 * sizeof(int)), cleanup);
-    CUDA_CHECK_GOTO(cudaMalloc((void **) &spacing_dev, 3 * sizeof(double)), cleanup);
-    CUDA_CHECK_GOTO(cudaMalloc((void **) &surfaceArea_dev, sizeof(double)), cleanup);
-    CUDA_CHECK_GOTO(cudaMalloc((void **) &volume_dev, sizeof(double)), cleanup);
-    CUDA_CHECK_GOTO(cudaMalloc((void **) &vertex_count_dev, sizeof(unsigned long long)), cleanup);
-    CUDA_CHECK_GOTO(cudaMalloc((void **) &diameters_sq_dev, 4 * sizeof(double)), cleanup);
-    CUDA_CHECK_GOTO(cudaMalloc((void **) &vertices_dev, vertices_bytes), cleanup);
+    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&mask_dev), mask_size_bytes), cleanup);
+    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&size_dev), 3 * sizeof(int)), cleanup);
+    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&strides_dev), 3 * sizeof(int)), cleanup);
+    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&spacing_dev), 3 * sizeof(double)), cleanup);
+    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&surfaceArea_dev), sizeof(double)), cleanup);
+    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&volume_dev), sizeof(double)), cleanup);
+    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&vertex_count_dev), sizeof(unsigned long long)), cleanup);
+    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&diameters_sq_dev), 4 * sizeof(double)), cleanup);
+    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&vertices_dev), vertices_bytes), cleanup);
 
     // --- 2. Initialize Device Memory (Scalars to 0) ---
     CUDA_CHECK_GOTO(cudaMemset(surfaceArea_dev, 0, sizeof(double)), cleanup);
@@ -68,19 +68,17 @@ int basic_cuda_launcher(
     // --- 3. Copy Input Data from Host to Device ---
     CUDA_CHECK_GOTO(cudaMemcpy(mask_dev, mask, mask_size_bytes, cudaMemcpyHostToDevice), cleanup);
     CUDA_CHECK_GOTO(cudaMemcpy(size_dev, size, 3 * sizeof(int), cudaMemcpyHostToDevice), cleanup);
-    CUDA_CHECK_GOTO(cudaMemcpy(strides_dev, strides, 3 * sizeof(int),
-                        cudaMemcpyHostToDevice), cleanup);
-    CUDA_CHECK_GOTO(cudaMemcpy(spacing_dev, spacing, 3 * sizeof(double),
-                        cudaMemcpyHostToDevice), cleanup);
+    CUDA_CHECK_GOTO(cudaMemcpy(strides_dev, strides, 3 * sizeof(int), cudaMemcpyHostToDevice), cleanup);
+    CUDA_CHECK_GOTO(cudaMemcpy(spacing_dev, spacing, 3 * sizeof(double), cudaMemcpyHostToDevice), cleanup);
 
     END_MEASUREMENT(0);
 
     // --- 4. Launch Marching Cubes Kernel ---
     if (num_cubes > 0) {
-        dim3 blockSize(8, 8, 8);
-        dim3 gridSize((size[2] - 1 + blockSize.x - 1) / blockSize.x,
-                      (size[1] - 1 + blockSize.y - 1) / blockSize.y,
-                      (size[0] - 1 + blockSize.z - 1) / blockSize.z);
+        constexpr dim3 blockSize(8, 8, 8);
+        const dim3 gridSize((size[2] - 1 + blockSize.x - 1) / blockSize.x,
+                           (size[1] - 1 + blockSize.y - 1) / blockSize.y,
+                           (size[0] - 1 + blockSize.z - 1) / blockSize.z);
 
         /* Call the main kernel */
         START_MEASUREMENT(1, "Marching Cubes Kernel");
@@ -129,7 +127,7 @@ int basic_cuda_launcher(
         constexpr dim3 blockSize(kBasicLauncherBlockSizeVolumetry);
         const size_t length = (vertex_count_host + kBasicLauncherBlockSizeVolumetry - 1) /
                               kBasicLauncherBlockSizeVolumetry;
-        const dim3 gridSize(length, length);
+        const dim3 gridSize(static_cast<unsigned int>(length), static_cast<unsigned int>(length));
 
         diam_kernel(
             gridSize,
@@ -144,39 +142,26 @@ int basic_cuda_launcher(
         CUDA_CHECK_GOTO(cudaMemcpy(diameters_sq_host, diameters_sq_dev,
                             4 * sizeof(double), cudaMemcpyDeviceToHost), cleanup);
 
-        diameters[0] = sqrt(diameters_sq_host[0]);
-        diameters[1] = sqrt(diameters_sq_host[1]);
-        diameters[2] = sqrt(diameters_sq_host[2]);
-        diameters[3] = sqrt(diameters_sq_host[3]);
+        // Calculate square roots for all diameters
+        std::transform(diameters_sq_host, diameters_sq_host + 4, diameters,
+                      [](double val) { return std::sqrt(val); });
     } else {
-        diameters[0] = 0.0;
-        diameters[1] = 0.0;
-        diameters[2] = 0.0;
-        diameters[3] = 0.0;
+        std::fill_n(diameters, 4, 0.0);
     }
 
     END_MEASUREMENT(2);
 
     // --- 7. Cleanup: Free GPU memory ---
 cleanup:
-    if (mask_dev)
-        CUDA_CHECK_EXIT(cudaFree(mask_dev));
-    if (size_dev)
-        CUDA_CHECK_EXIT(cudaFree(size_dev));
-    if (strides_dev)
-        CUDA_CHECK_EXIT(cudaFree(strides_dev));
-    if (spacing_dev)
-        CUDA_CHECK_EXIT(cudaFree(spacing_dev));
-    if (surfaceArea_dev)
-        CUDA_CHECK_EXIT(cudaFree(surfaceArea_dev));
-    if (volume_dev)
-        CUDA_CHECK_EXIT(cudaFree(volume_dev));
-    if (vertices_dev)
-        CUDA_CHECK_EXIT(cudaFree(vertices_dev));
-    if (vertex_count_dev)
-        CUDA_CHECK_EXIT(cudaFree(vertex_count_dev));
-    if (diameters_sq_dev)
-        CUDA_CHECK_EXIT(cudaFree(diameters_sq_dev));
+    if (mask_dev) CUDA_CHECK_EXIT(cudaFree(mask_dev));
+    if (size_dev) CUDA_CHECK_EXIT(cudaFree(size_dev));
+    if (strides_dev) CUDA_CHECK_EXIT(cudaFree(strides_dev));
+    if (spacing_dev) CUDA_CHECK_EXIT(cudaFree(spacing_dev));
+    if (surfaceArea_dev) CUDA_CHECK_EXIT(cudaFree(surfaceArea_dev));
+    if (volume_dev) CUDA_CHECK_EXIT(cudaFree(volume_dev));
+    if (vertices_dev) CUDA_CHECK_EXIT(cudaFree(vertices_dev));
+    if (vertex_count_dev) CUDA_CHECK_EXIT(cudaFree(vertex_count_dev));
+    if (diameters_sq_dev) CUDA_CHECK_EXIT(cudaFree(diameters_sq_dev));
 
     return cudaStatus == cudaSuccess ? 0 : 1;
 }
