@@ -1,6 +1,8 @@
 #ifndef REDUCED_READS_CUH
 #define REDUCED_READS_CUH
 
+#include <assert.h>
+
 #include "constants.cuh"
 #include "helpers.cuh"
 
@@ -32,6 +34,11 @@ static __global__ void calculate_meshDiameter_kernel(
     __shared__ double s_vert_z[kBasicLauncherBlockSizeVolumetry];
 
     const size_t read_idx = blockIdx.y * kBasicLauncherBlockSizeVolumetry + threadIdx.x;
+
+    if (read_idx >= num_vertices) {
+        return;
+    }
+
     s_vert_x[threadIdx.x] = x_table[read_idx];
     s_vert_y[threadIdx.x] = y_table[read_idx];
     s_vert_z[threadIdx.x] = z_table[read_idx];
@@ -60,13 +67,13 @@ static __global__ void calculate_meshDiameter_kernel(
             const double dist_sq = dx * dx + dy * dy + dz * dz;
             atomicMax(&diameters_sq[3], dist_sq);
             if (ax == bx) {
-                atomicMax(&diameters_sq[0], dist_sq);
+                atomicMax(&diameters_sq[2], dist_sq);
             }
             if (ay == by) {
                 atomicMax(&diameters_sq[1], dist_sq);
             }
             if (az == bz) {
-                atomicMax(&diameters_sq[2], dist_sq);
+                atomicMax(&diameters_sq[0], dist_sq);
             }
         }
     } else {
