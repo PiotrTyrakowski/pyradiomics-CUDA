@@ -347,12 +347,13 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
 
     /* Display descriptor table */
     fprintf(file, "Descriptor table:\n");
+    size_t id = 0;
     for (size_t i = 0; i < MAX_SOL_FUNCTIONS; ++i) {
         if (g_ShapeFunctions[i] == NULL) {
             continue;
         }
 
-        fprintf(file, "Function %lu: %s\n", i, g_ShapeFunctionNames[i]);
+        fprintf(file, "Function %lu: %s\n", id++, g_ShapeFunctionNames[i]);
     }
     fprintf(file, "\n");
 

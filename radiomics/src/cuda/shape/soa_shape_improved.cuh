@@ -18,6 +18,9 @@ static __global__ void calculate_coefficients_kernel(
     __shared__ double s_vertList[12][3];
     __shared__ int8_t s_gridAngles[8][3];
 
+    __shared__ double s_surfaceArea[kBasicMarchingCubesBlockSize];
+    __shared__ double s_volume[kBasicMarchingCubesBlockSize];
+
     const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
     const int blockSize = blockDim.x * blockDim.y * blockDim.z;
 
@@ -42,16 +45,21 @@ static __global__ void calculate_coefficients_kernel(
         s_gridAngles[row][col] = d_gridAngles[row][col];
     }
 
+    s_surfaceArea[tid] = 0;
+    s_volume[tid] = 0;
+
+    unsigned char cube_idx = 0;
+    int sign_correction = 1;
+
     __syncthreads();
 
     // Bounds check: Ensure the indices are within the valid range for cube
     // origins
     if (iz >= size[0] - 1 || iy >= size[1] - 1 || ix >= size[2] - 1) {
-        return;
+        goto reduction;
     }
 
     // --- Calculate Cube Index ---
-    unsigned char cube_idx = 0;
     for (int a_idx = 0; a_idx < 8; a_idx += 2) {
         // Calculate the linear index for each corner of the cube
         const int corner_idx_1 = (iz + s_gridAngles[a_idx][0]) * strides[0] +
@@ -67,7 +75,6 @@ static __global__ void calculate_coefficients_kernel(
     }
 
     // --- Symmetry Optimization & Skipping ---
-    int sign_correction = 1;
     if (cube_idx & 0x80) {
         // If the 8th bit (corresponding to point p7) is set
         cube_idx ^= 0xff; // Flip all bits
@@ -76,121 +83,138 @@ static __global__ void calculate_coefficients_kernel(
 
     // Skip cubes entirely inside or outside (index 0 after potential flip)
     if (cube_idx == 0) {
-        return;
+        goto reduction;
+    } {
+        // --- Store Vertices for Diameter Calculation ---
+        // Store vertices on edges 6, 7, 11 if the corresponding points (bits 6, 4, 3)
+        // are set in the *potentially flipped* cube_idx, matching the C code logic.
+        const int num_new_vertices =
+                ((cube_idx & (1 << 6)) != 0) +
+                ((cube_idx & (1 << 4)) != 0) +
+                ((cube_idx & (1 << 3)) != 0);
+
+        if (num_new_vertices > 0) {
+            unsigned long long start_v_idx =
+                    atomicAdd(vertex_count, (unsigned long long) num_new_vertices);
+
+            if (start_v_idx + num_new_vertices >= max_vertices) {
+                // If overflow occurs, the vertex_count will exceed max_vertices, handled in
+                // host code.
+
+                return;
+            }
+
+            double *x_table = vertices + (0 * max_vertices) + start_v_idx;
+            double *y_table = vertices + (1 * max_vertices) + start_v_idx;
+            double *z_table = vertices + (2 * max_vertices) + start_v_idx;
+            size_t idx = 0;
+
+            // Check bit 6 (original point p6, edge 6) using potentially flipped cube_idx
+            if (cube_idx & (1 << 6)) {
+                static constexpr int kEdgeIdx = 6;
+
+                x_table[0] = (((double) ix) + s_vertList[kEdgeIdx][2]) * spacing[2];
+                y_table[0] = (((double) iy) + s_vertList[kEdgeIdx][1]) * spacing[1];
+                z_table[0] = (((double) iz) + s_vertList[kEdgeIdx][0]) * spacing[0];
+
+                idx = 1;
+            }
+
+            // Check bit 4 (original point p4, edge 7) using potentially flipped cube_idx
+            if (cube_idx & (1 << 4)) {
+                static constexpr int kEdgeIdx = 7;
+
+                x_table[idx] = (((double) ix) + s_vertList[kEdgeIdx][2]) * spacing[2];
+                y_table[idx] = (((double) iy) + s_vertList[kEdgeIdx][1]) * spacing[1];
+                z_table[idx] = (((double) iz) + s_vertList[kEdgeIdx][0]) * spacing[0];
+
+                ++idx;
+            }
+
+            // Check bit 3 (original point p3, edge 11) using potentially flipped cube_idx
+            if (cube_idx & (1 << 3)) {
+                static constexpr int kEdgeidx = 11;
+
+                x_table[idx] = (((double) ix) + s_vertList[kEdgeidx][2]) * spacing[2];
+                y_table[idx] = (((double) iy) + s_vertList[kEdgeidx][1]) * spacing[1];
+                z_table[idx] = (((double) iz) + s_vertList[kEdgeidx][0]) * spacing[0];
+            }
+        }
+
+        // --- Process Triangles for Surface Area and Volume ---
+        double local_SA = 0;
+        double local_Vol = 0;
+
+        int t = 0;
+        // Iterate through triangles defined in d_triTable for the current cube_idx
+        while (s_triTable[cube_idx][t * 3] >= 0) {
+            double p1[3], p2[3], p3[3]; // Triangle vertex coordinates
+            double v1[3], v2[3], cross[3]; // Vectors for calculations
+
+            // Get vertex indices from the table
+            int v_idx_1 = s_triTable[cube_idx][t * 3];
+            int v_idx_2 = s_triTable[cube_idx][t * 3 + 1];
+            int v_idx_3 = s_triTable[cube_idx][t * 3 + 2];
+
+            // Calculate absolute coordinates for each vertex
+            for (int d = 0; d < 3; ++d) {
+                p1[d] = (((double) (d == 0 ? iz : (d == 1 ? iy : ix))) +
+                         s_vertList[v_idx_1][d]) *
+                        spacing[d];
+                p2[d] = (((double) (d == 0 ? iz : (d == 1 ? iy : ix))) +
+                         s_vertList[v_idx_2][d]) *
+                        spacing[d];
+                p3[d] = (((double) (d == 0 ? iz : (d == 1 ? iy : ix))) +
+                         s_vertList[v_idx_3][d]) *
+                        spacing[d];
+            }
+
+            // Volume contribution: (p1 x p2) . p3 (adjust sign later)
+            cross[0] = (p1[1] * p2[2]) - (p2[1] * p1[2]);
+            cross[1] = (p1[2] * p2[0]) - (p2[2] * p1[0]);
+            cross[2] = (p1[0] * p2[1]) - (p2[0] * p1[1]);
+            local_Vol += cross[0] * p3[0] + cross[1] * p3[1] + cross[2] * p3[2];
+
+            // Surface Area contribution: 0.5 * |(p2-p1) x (p3-p1)|
+            for (int d = 0; d < 3; ++d) {
+                v1[d] = p2[d] - p1[d]; // Vector from p1 to p2
+                v2[d] = p3[d] - p1[d]; // Vector from p1 to p3
+            }
+
+            cross[0] = (v1[1] * v2[2]) - (v2[1] * v1[2]);
+            cross[1] = (v1[2] * v2[0]) - (v2[2] * v1[0]);
+            cross[2] = (v1[0] * v2[1]) - (v2[0] * v1[1]);
+
+            double mag_sq =
+                    cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2];
+            local_SA += 0.5 * sqrt(mag_sq); // Add area of this triangle
+
+            t++; // Move to the next triangle for this cube
+        }
+
+        s_surfaceArea[tid] = local_SA;
+        s_volume[tid] = sign_correction * local_Vol;
     }
 
-    // --- Store Vertices for Diameter Calculation ---
-    // Store vertices on edges 6, 7, 11 if the corresponding points (bits 6, 4, 3)
-    // are set in the *potentially flipped* cube_idx, matching the C code logic.
-    const int num_new_vertices =
-            ((cube_idx & (1 << 6)) != 0) +
-            ((cube_idx & (1 << 4)) != 0) +
-            ((cube_idx & (1 << 3)) != 0);
+reduction:
 
-    if (num_new_vertices > 0) {
-        unsigned long long start_v_idx =
-                atomicAdd(vertex_count, (unsigned long long) num_new_vertices);
+    __syncthreads();
 
-        if (start_v_idx + num_new_vertices >= max_vertices) {
-            // If overflow occurs, the vertex_count will exceed max_vertices, handled in
-            // host code.
-
-            return;
+    // Block-level reduction using shared memory
+    // Reduce surface area and volume in parallel
+    for (int stride = blockSize / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            s_surfaceArea[tid] += s_surfaceArea[tid + stride];
+            s_volume[tid] += s_volume[tid + stride];
         }
-
-        double* x_table = vertices + (0 * max_vertices) + start_v_idx;
-        double* y_table = vertices + (1 * max_vertices) + start_v_idx;
-        double* z_table = vertices + (2 * max_vertices) + start_v_idx;
-        size_t idx = 0;
-
-        // Check bit 6 (original point p6, edge 6) using potentially flipped cube_idx
-        if (cube_idx & (1 << 6)) {
-            static constexpr int kEdgeIdx = 6;
-
-            x_table[0] = (((double) ix) + s_vertList[kEdgeIdx][2]) * spacing[2];
-            y_table[0] = (((double) iy) + s_vertList[kEdgeIdx][1]) * spacing[1];
-            z_table[0] = (((double) iz) + s_vertList[kEdgeIdx][0]) * spacing[0];
-
-            idx = 1;
-        }
-
-        // Check bit 4 (original point p4, edge 7) using potentially flipped cube_idx
-        if (cube_idx & (1 << 4)) {
-            static constexpr int kEdgeIdx = 7;
-
-            x_table[idx] = (((double) ix) + s_vertList[kEdgeIdx][2]) * spacing[2];
-            y_table[idx] = (((double) iy) + s_vertList[kEdgeIdx][1]) * spacing[1];
-            z_table[idx] = (((double) iz) + s_vertList[kEdgeIdx][0]) * spacing[0];
-
-            ++idx;
-        }
-
-        // Check bit 3 (original point p3, edge 11) using potentially flipped cube_idx
-        if (cube_idx & (1 << 3)) {
-            static constexpr int kEdgeidx = 11;
-
-            x_table[idx] = (((double) ix) + s_vertList[kEdgeidx][2]) * spacing[2];
-            y_table[idx] = (((double) iy) + s_vertList[kEdgeidx][1]) * spacing[1];
-            z_table[idx] = (((double) iz) + s_vertList[kEdgeidx][0]) * spacing[0];
-        }
+        __syncthreads();
     }
 
-    // --- Process Triangles for Surface Area and Volume ---
-    double local_SA = 0;
-    double local_Vol = 0;
-
-    int t = 0;
-    // Iterate through triangles defined in d_triTable for the current cube_idx
-    while (s_triTable[cube_idx][t * 3] >= 0) {
-        double p1[3], p2[3], p3[3]; // Triangle vertex coordinates
-        double v1[3], v2[3], cross[3]; // Vectors for calculations
-
-        // Get vertex indices from the table
-        int v_idx_1 = s_triTable[cube_idx][t * 3];
-        int v_idx_2 = s_triTable[cube_idx][t * 3 + 1];
-        int v_idx_3 = s_triTable[cube_idx][t * 3 + 2];
-
-        // Calculate absolute coordinates for each vertex
-        for (int d = 0; d < 3; ++d) {
-            p1[d] = (((double) (d == 0 ? iz : (d == 1 ? iy : ix))) +
-                     s_vertList[v_idx_1][d]) *
-                    spacing[d];
-            p2[d] = (((double) (d == 0 ? iz : (d == 1 ? iy : ix))) +
-                     s_vertList[v_idx_2][d]) *
-                    spacing[d];
-            p3[d] = (((double) (d == 0 ? iz : (d == 1 ? iy : ix))) +
-                     s_vertList[v_idx_3][d]) *
-                    spacing[d];
-        }
-
-        // Volume contribution: (p1 x p2) . p3 (adjust sign later)
-        cross[0] = (p1[1] * p2[2]) - (p2[1] * p1[2]);
-        cross[1] = (p1[2] * p2[0]) - (p2[2] * p1[0]);
-        cross[2] = (p1[0] * p2[1]) - (p2[0] * p1[1]);
-        local_Vol += cross[0] * p3[0] + cross[1] * p3[1] + cross[2] * p3[2];
-
-        // Surface Area contribution: 0.5 * |(p2-p1) x (p3-p1)|
-        for (int d = 0; d < 3; ++d) {
-            v1[d] = p2[d] - p1[d]; // Vector from p1 to p2
-            v2[d] = p3[d] - p1[d]; // Vector from p1 to p3
-        }
-
-        cross[0] = (v1[1] * v2[2]) - (v2[1] * v1[2]);
-        cross[1] = (v1[2] * v2[0]) - (v2[2] * v1[0]);
-        cross[2] = (v1[0] * v2[1]) - (v2[0] * v1[1]);
-
-        double mag_sq =
-                cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2];
-        local_SA += 0.5 * sqrt(mag_sq); // Add area of this triangle
-
-        t++; // Move to the next triangle for this cube
+    // Only thread 0 in each block adds the block's total to global memory
+    if (tid == 0) {
+        atomicAdd(surfaceArea, s_surfaceArea[0]);
+        atomicAdd(volume, s_volume[0]);
     }
-
-    // Atomically add the calculated contributions for this cube to the global
-    // totals
-    atomicAdd(surfaceArea, local_SA);
-    atomicAdd(volume,
-              sign_correction * local_Vol); // Apply sign correction for volume
 }
 
 #endif //SOA_SHAPE_CUH
