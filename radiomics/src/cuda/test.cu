@@ -94,7 +94,6 @@ SOLUTION_DECL(7);
 SOLUTION_DECL(8);
 SOLUTION_DECL(9);
 SOLUTION_DECL(10);
-SOLUTION_DECL(11);
 
 void RegisterSolutions() {
   REGISTER_SOLUTION(0, "Basic implementation");
@@ -108,5 +107,4 @@ void RegisterSolutions() {
   REGISTER_SOLUTION(8, "Reduced memory reads");
   REGISTER_SOLUTION(9, "Reduced memory reads with no atomics");
   REGISTER_SOLUTION(10, "Reduced memory reads - single dim");
-  REGISTER_SOLUTION(11, "Reduced memory reads - improved marching");
 }
