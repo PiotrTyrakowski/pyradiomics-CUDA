@@ -91,6 +91,13 @@ static __global__ void calculate_coefficients_kernel(
         unsigned long long start_v_idx =
                 atomicAdd(vertex_count, (unsigned long long) num_new_vertices);
 
+        if (start_v_idx + num_new_vertices >= max_vertices) {
+            // If overflow occurs, the vertex_count will exceed max_vertices, handled in
+            // host code.
+
+            return;
+        }
+
         double* x_table = vertices + (0 * max_vertices) + start_v_idx;
         double* y_table = vertices + (1 * max_vertices) + start_v_idx;
         double* z_table = vertices + (2 * max_vertices) + start_v_idx;

@@ -5,8 +5,7 @@
 #include <shape/basic_implementation.cuh>
 #include "test/inline_measurment.hpp"
 
-static void calculate_meshDiameter(double *points, size_t stack_top, double *diameters)
-{
+static void calculate_meshDiameter(double *points, size_t stack_top, double *diameters) {
     double a[3], b[3], ab[3];
     double distance;
     size_t idx;
@@ -17,14 +16,12 @@ static void calculate_meshDiameter(double *points, size_t stack_top, double *dia
     diameters[3] = 0;
 
     // when the first item is popped, it is the last item entered
-    while(stack_top > 0)
-    {
+    while (stack_top > 0) {
         a[2] = points[--stack_top];
         a[1] = points[--stack_top];
         a[0] = points[--stack_top];
 
-        for (idx = 0; idx < stack_top; idx += 3)
-        {
+        for (idx = 0; idx < stack_top; idx += 3) {
             b[0] = points[idx];
             b[1] = points[idx + 1];
             b[2] = points[idx + 2];
@@ -156,13 +153,18 @@ int basic_cuda_launcher(
     *volume = volume_host / 6.0;
     *surfaceArea = surfaceArea_host;
 
-    /* copy back to cpu */
+    // Check if vertex buffer might have overflowed
+    if (vertex_count_host > max_possible_vertices) {
+        cudaStatus = cudaErrorUnknown;
+        goto cleanup;
+    }
 
+    /* copy back to cpu */
     START_MEASUREMENT(2, "Volumetric Kernel");
     if (vertex_count_host > 0) {
         size_t vertices_to_copy = vertex_count_host * 3 * sizeof(double);
 
-        h_vertices = (double *)malloc(vertices_to_copy);
+        h_vertices = (double *) malloc(vertices_to_copy);
 
         // Copy vertices from device to host
         CUDA_CHECK_GOTO(cudaMemcpy(h_vertices, vertices_dev, vertices_to_copy,
@@ -201,7 +203,7 @@ cleanup:
     if (h_vertices)
         free(h_vertices);
 
-    return cudaStatus;
+    return cudaStatus == cudaSuccess ? 0 : 1;
 }
 
 // ------------------------------

@@ -6,7 +6,7 @@ from radiomics import getFeatureClasses, imageoperations
 
 from radiomics.featureextractor import RadiomicsFeatureExtractor
 
-def _write_shape_class_to_file(shapeClass, base_dir=None):
+def _write_shape_class_to_file(shapeClass, out_dir, base_dir=None):
   """
   Write shape class atributes to separate files in a date-based folder.
   
@@ -16,11 +16,10 @@ def _write_shape_class_to_file(shapeClass, base_dir=None):
   """
   try:
     # Create folder with current date and time including seconds
-    now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     if base_dir:
-      output_dir = os.path.join(base_dir, "data", now)
+      output_dir = os.path.join(base_dir, "data", out_dir)
     else:
-      output_dir = os.path.join("data", now)
+      output_dir = os.path.join("data", out_dir)
     # Ensure the directory exists
     os.makedirs(output_dir, exist_ok=True)
     
@@ -102,6 +101,7 @@ class RadiomicsFeatureWriter(RadiomicsFeatureExtractor):
     super().__init__()
     self.base_dir = base_dir
     self.out_dirs = []
+    self.idx = 0
 
   def saveShape(self, image, mask, boundingBox, **kwargs):
     featureVector = collections.OrderedDict()
@@ -114,7 +114,7 @@ class RadiomicsFeatureWriter(RadiomicsFeatureExtractor):
         raise RuntimeError("Shape features are only implemented for 3D images.")
 
       shapeClass = getFeatureClasses()['shape'](croppedImage, croppedMask, **kwargs)
-      output = _write_shape_class_to_file(shapeClass, self.base_dir)
+      output = _write_shape_class_to_file(shapeClass, f"data_{self.idx}", self.base_dir)
       self.out_dirs.append(output)
 
     if 'shape2D' in enabledFeatures.keys():
@@ -124,6 +124,7 @@ class RadiomicsFeatureWriter(RadiomicsFeatureExtractor):
 
   def save_npy_files(self, scan_path, mask_path, idx):
     old_shape_compute = self.computeShape
+    self.idx = idx
 
     self.computeShape = self.saveShape
     result =  self.execute(scan_path, mask_path, idx)
