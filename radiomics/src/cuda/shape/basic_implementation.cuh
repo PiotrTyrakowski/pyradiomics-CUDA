@@ -4,7 +4,7 @@
 #include "tables.cuh"
 #include <cstddef>
 
-static __global__ void calculate_coefficients_kernel(
+static __global__ void ShapeKernelBasic(
     const char* const __restrict__ mask,
     const int* const __restrict__ size,
     const int* const __restrict__ strides,

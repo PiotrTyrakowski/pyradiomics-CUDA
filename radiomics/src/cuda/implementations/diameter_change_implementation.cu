@@ -14,7 +14,7 @@
 
 SOLUTION_DECL(1) {
     return CUDA_BASIC_LAUNCH_SOLUTION(
-        calculate_coefficients_kernel,
+        ShapeKernelBasic,
         calculate_meshDiameter_kernel
     );
 }
