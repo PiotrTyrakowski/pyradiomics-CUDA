@@ -3,7 +3,7 @@
 
 #include "helpers.cuh"
 
-static __global__ void calculate_meshDiameter_kernel(
+static __global__ void VolumetryKernelLocalAccumulatorWithAtomicFinal(
     const double
     *vertices, // Input: Array of vertex coordinates (x, y, z, x, y, z, ...)
     size_t num_vertices, // Input: Total number of valid vertices in the array

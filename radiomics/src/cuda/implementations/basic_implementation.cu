@@ -15,6 +15,6 @@
 SOLUTION_DECL(0) {
     return CUDA_BASIC_LAUNCH_SOLUTION(
         ShapeKernelBasic,
-        calculate_meshDiameter_kernel
+        VolumetryKernelBasic
     );
 }

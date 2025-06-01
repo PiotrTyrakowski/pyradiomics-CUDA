@@ -15,6 +15,6 @@
 SOLUTION_DECL(8) {
     return CUDA_SQUARE_LAUNCH_SOLUTION(
         ShapeKernelSharedMemorySoa,
-        calculate_meshDiameter_kernel
+        VolumetryKernelSoaMatrixBasedFullAtomics
     );
 }

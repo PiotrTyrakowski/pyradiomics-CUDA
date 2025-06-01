@@ -15,6 +15,6 @@
 SOLUTION_DECL(3) {
     return CUDA_BASIC_LAUNCH_SOLUTION(
         ShapeKernelSharedMemory,
-        calculate_meshDiameter_kernel
+        VolumetryKernelLocalAccumulatorWithAtomicFinal
     );
 }

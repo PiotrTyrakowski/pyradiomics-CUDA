@@ -2,7 +2,7 @@
 #define SOA_REDUCED_ATOMICS_CUH
 #include "constants.cuh"
 
-static __global__ void calculate_meshDiameter_kernel(
+static __global__ void VolumetryKernelSoaBlockReductionFinalAtomic(
     const double *vertices,
     size_t num_vertices,
     double *diameters_sq,

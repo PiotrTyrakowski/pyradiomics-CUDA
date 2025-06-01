@@ -2,7 +2,7 @@
 #define VOLUMETRY_STRUCTURED_IMPLEMENTATION_CUH_
 #include "helpers.cuh"
 
-static __global__ void calculate_meshDiameter_kernel(
+static __global__ void VolumetryKernelBasicSoa(
     const double *vertices,
     const size_t num_vertices,
     double *diameters_sq,

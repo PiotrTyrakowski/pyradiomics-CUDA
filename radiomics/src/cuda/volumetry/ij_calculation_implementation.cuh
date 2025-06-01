@@ -45,7 +45,7 @@ __device__ inline void get_ij_from_pair_index(
 }
 
 
-static __global__ void calculate_meshDiameter_kernel(
+static __global__ void VolumetryKernelEqualWorkDistribution(
     const double
     *vertices, // Input: Array of vertex coordinates (x, y, z, x, y, z, ...)
     size_t num_vertices, // Input: Total number of valid vertices in the array

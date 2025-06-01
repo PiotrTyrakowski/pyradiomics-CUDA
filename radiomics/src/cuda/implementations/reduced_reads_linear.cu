@@ -15,6 +15,6 @@
 SOLUTION_DECL(10) {
     return CUDA_ASYNC_LAUNCH_SOLUTION(
         ShapeKernelSharedMemorySoa,
-        calculate_meshDiameter_kernel
+        VolumetryKernelSoaMatrixBasedFullAtomicsReuseSameThreads
     );
 }

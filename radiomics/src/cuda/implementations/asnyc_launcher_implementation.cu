@@ -15,6 +15,6 @@
 SOLUTION_DECL(2) {
     return CUDA_ASYNC_LAUNCH_SOLUTION(
         ShapeKernelBasic,
-        calculate_meshDiameter_kernel
+        VolumetryKernelBasic
     );
 }
