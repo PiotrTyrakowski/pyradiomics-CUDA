@@ -353,7 +353,7 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
             continue;
         }
 
-        fprintf(file, "Function %lu: %s\n", id++, g_ShapeFunctionNames[i]);
+        fprintf(file, "Function %lu: %s\n", 1 + id++, g_ShapeFunctionNames[i]);
     }
     fprintf(file, "\n");
 
@@ -396,7 +396,6 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
             }
         }
 
-
         fputs("\n", file);
 
         if (i != test_sum - 1) {
@@ -404,7 +403,39 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
         }
     }
 
+    fputs("\n\n", file);
+
+    /* Print simple time table with ms values */
+    fprintf(file, "Time Table (milliseconds):\n");
+    fprintf(file, " Function       |");
+    for (size_t i = 0; i < test_sum; ++i) {
+        fprintf(file, " %14lu ", i);
+        if (i != test_sum - 1) {
+            fputs("|", file);
+        }
+    }
     fputs("\n", file);
+
+    PrintSeparator_(file, test_sum);
+    fprintf(file, " Time (ms)      |");
+
+    for (size_t i = 0; i < test_sum; ++i) {
+        const size_t result_idx = idx * test_sum + i;
+        const time_measurement_t *measurement = GetMeasurement_(results + result_idx, name);
+
+        if (measurement) {
+            const double time_ms = (double) GetAverageTime_(measurement) / 1000000.0; // Convert nanoseconds to milliseconds
+            fprintf(file, " %14.3f ", time_ms);
+        } else {
+            fprintf(file, " %14s ", "N/A");
+        }
+
+        if (i != test_sum - 1) {
+            fputs("|", file);
+        }
+    }
+
+    fputs("\n\n", file);
 }
 
 static int ShouldPrint_(const char **names, size_t *top, const char *name) {
