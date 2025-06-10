@@ -115,7 +115,6 @@ else ()
     message(FATAL_ERROR "Unsupported compiler.")
 endif ()
 
-# Compilation options for different build types
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
 
     set_source_files_properties(
@@ -128,16 +127,28 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
             PROPERTIES COMPILE_OPTIONS "-O3;-march=native"
     )
 
-else ()
+elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
 
     set_source_files_properties(
             ${CUDA_SOURCES}
-            PROPERTIES COMPILE_OPTIONS "-v;--generate-line-info;-g3;-fno-omit-frame-pointer;-g;-G;-O0"
+            PROPERTIES COMPILE_OPTIONS "-lineinfo;-g;-Xcompiler;-g;-O2;-Xcompiler;-O2;-Xcompiler;-march=native;--ptxas-options=-v"
     )
 
     set_source_files_properties(
             "${PYRADIOMICS_C};${C_SOURCES}"
-            PROPERTIES COMPILE_OPTIONS "-O0;-march=native;-g;"
+            PROPERTIES COMPILE_OPTIONS "-O2;-march=native;-g"
+    )
+
+else ()
+
+    set_source_files_properties(
+            ${CUDA_SOURCES}
+            PROPERTIES COMPILE_OPTIONS "-lineinfo;-g;-G;-Xcompiler;-g;-O0;--ptxas-options=-v"
+    )
+
+    set_source_files_properties(
+            "${PYRADIOMICS_C};${C_SOURCES}"
+            PROPERTIES COMPILE_OPTIONS "-O0;-g;-fno-omit-frame-pointer"
     )
 
 endif ()
