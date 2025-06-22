@@ -137,6 +137,8 @@ int async_cuda_launcher(
         goto cleanup;
     }
 
+    SetDataSize(*vertex_count_host);
+
     // Launch diameter kernel only if vertices were generated
     if (*vertex_count_host > 0) {
         const size_t num_vertices_actual = *vertex_count_host;

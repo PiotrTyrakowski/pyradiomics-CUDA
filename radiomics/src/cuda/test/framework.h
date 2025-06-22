@@ -101,6 +101,8 @@ void CleanupResults(test_result_t *result);
 
 void DisplayResults(FILE *file, test_result_t *results, size_t results_size);
 
+void SetDataSize(uint64_t size);
+
 // ------------------------------
 // Core functions
 // ------------------------------

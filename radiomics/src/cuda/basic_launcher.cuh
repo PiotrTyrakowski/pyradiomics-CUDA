@@ -121,6 +121,8 @@ int basic_cuda_launcher(
 
     START_MEASUREMENT(2, "Volumetric Kernel");
 
+    SetDataSize(vertex_count_host);
+
     // --- 6. Launch Diameter Kernel (only if vertices were generated) ---
     if (vertex_count_host > 0) {
         const size_t num_vertices_actual = vertex_count_host;

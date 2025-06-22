@@ -31,6 +31,8 @@ app_state_t g_AppState = {
     .current_test = NULL,
 };
 
+static uint64_t g_DataSize{};
+
 // ------------------------------
 // Static functions
 // ------------------------------
@@ -336,6 +338,10 @@ static time_measurement_t *GetMeasurement_(test_result_t *result, const char *na
     return NULL;
 }
 
+void SetDataSize(uint64_t size) {
+    g_DataSize = size;
+}
+
 static uint64_t GetAverageTime_(const time_measurement_t *measurement) {
     assert(measurement->retries == g_AppState.num_rep_tests || measurement->retries == 1);
     return measurement->time_ns / measurement->retries;
@@ -426,6 +432,40 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
         if (measurement) {
             const double time_ms = (double) GetAverageTime_(measurement) / 1000000.0; // Convert nanoseconds to milliseconds
             fprintf(file, " %14.3f ", time_ms);
+        } else {
+            fprintf(file, " %14s ", "N/A");
+        }
+
+        if (i != test_sum - 1) {
+            fputs("|", file);
+        }
+    }
+
+    fputs("\n\n", file);
+
+    /* Print data size based table */
+    fprintf(file, "Number of vertices per second (1/ms):\n");
+    fprintf(file, " Function       |");
+    for (size_t i = 0; i < test_sum; ++i) {
+        fprintf(file, " %14lu ", i);
+        if (i != test_sum - 1) {
+            fputs("|", file);
+        }
+    }
+    fputs("\n", file);
+
+    PrintSeparator_(file, test_sum);
+    fprintf(file, " Vert/ms (1/ms) |");
+
+    for (size_t i = 0; i < test_sum; ++i) {
+        const size_t result_idx = idx * test_sum + i;
+        const time_measurement_t *measurement = GetMeasurement_(results + result_idx, name);
+
+        if (measurement) {
+            const double time_ms = (double) GetAverageTime_(measurement) / 1000000.0; // Convert nanoseconds to milliseconds
+            const double data_size = (double) g_DataSize;
+            const double ver_per_ms = data_size / time_ms;
+            fprintf(file, " %14.3f ", ver_per_ms);
         } else {
             fprintf(file, " %14s ", "N/A");
         }
