@@ -575,6 +575,12 @@ void ParseCLI(int argc, const char **argv) {
 }
 
 void DisplayHelp() {
+#ifdef NDEBUG
+    printf("TEST_APP (Release Build)\n");
+#else
+    printf("TEST_APP (Debug Build)\n");
+#endif
+
     printf(
         "TEST_APP -f|--files <list of input files>  [-v|--verbose] [-o|--output] [-d|--detailed] [-r|--retries <number>]<filename = out.txt>\n"
         "\n"
