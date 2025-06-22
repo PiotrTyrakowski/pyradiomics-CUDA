@@ -31,7 +31,7 @@ app_state_t g_AppState = {
     .current_test = NULL,
 };
 
-static uint64_t g_DataSize{};
+static uint64_t g_DataSize = 0;
 
 // ------------------------------
 // Static functions
