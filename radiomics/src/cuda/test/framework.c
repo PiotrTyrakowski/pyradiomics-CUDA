@@ -23,6 +23,7 @@ app_state_t g_AppState = {
     .detailed_flag = 0,
     .no_errors_flag = 0,
     .num_rep_tests = 10,
+    .generate_csv = 0,
     .input_files = NULL,
     .size_files = 0,
     .output_file = "./out.txt",
@@ -534,6 +535,46 @@ static void DisplayAllMatricesIfNeeded_(FILE *file, size_t idx) {
     }
 }
 
+static void GenerateCsv_(FILE* file, test_result_t *results, size_t results_size) {
+    const size_t test_sum = GetTestCount_();
+    if (results_size == 0 || test_sum == 0) {
+        return;
+    }
+
+    // Generate header
+    fprintf(file, "data_input,pyradiomics");
+    size_t custom_func_count = 0;
+    for (size_t i = 0; i < MAX_SOL_FUNCTIONS; ++i) {
+        if (g_ShapeFunctions[i] != NULL) {
+            fprintf(file, ",%s", g_ShapeFunctionNames[i]);
+            custom_func_count++;
+        }
+    }
+    fprintf(file, "\n");
+
+    // Generate data rows
+    const size_t num_files = results_size / test_sum;
+    for (size_t file_idx = 0; file_idx < num_files; ++file_idx) {
+        fprintf(file, "%s", g_AppState.input_files[file_idx]);
+
+        for (size_t test_idx = 0; test_idx < test_sum; ++test_idx) {
+            const size_t result_idx = file_idx * test_sum + test_idx;
+            test_result_t *result = &results[result_idx];
+            const time_measurement_t *measurement = GetMeasurement_(result, MAIN_MEASUREMENT_NAME);
+
+            fprintf(file, ",");
+            if (measurement) {
+                const uint64_t avg_time_ns = GetAverageTime_(measurement);
+                const double time_ms = (double)avg_time_ns / 1000000.0;
+                fprintf(file, "%f", time_ms);
+            } else {
+                fprintf(file, "N/A");
+            }
+        }
+        fprintf(file, "\n");
+    }
+}
+
 // ------------------------------
 // Implementation
 // ------------------------------
@@ -585,6 +626,8 @@ void ParseCLI(int argc, const char **argv) {
             g_AppState.num_rep_tests = retries;
         } else if (strcmp(argv[i], "--no-errors") == 0) {
             g_AppState.no_errors_flag = 1;
+        } else if (strcmp(argv[i], "--csv") == 0) {
+            g_AppState.generate_csv = 1;
         } else {
             FailApplication("Unknown option provided");
         }
@@ -618,12 +661,30 @@ void FinalizeTesting() {
         FailApplication("Failed to open output file...");
     }
 
+    FILE *csv_file = NULL;
+    if (g_AppState.generate_csv) {
+        char *csv_filename = (char *) malloc(strlen(g_AppState.output_file) + 5);
+        snprintf(csv_filename, strlen(g_AppState.output_file) + 5, "%s.csv", g_AppState.output_file);
+        csv_file = fopen(csv_filename, "w");
+        free(csv_filename);
+
+        if (csv_file == NULL) {
+            FailApplication("Failed to open CSV output file...");
+        }
+    }
+
     DisplayResults(file, g_AppState.results, g_AppState.results_counter);
 
     /* Write results to stdout */
     DisplayResults(stdout, g_AppState.results, g_AppState.results_counter);
 
+    if (g_AppState.generate_csv) {
+        GenerateCsv_(csv_file, g_AppState.results, g_AppState.results_counter);
+        fclose(csv_file);
+    }
+
     free(g_AppState.input_files);
+    fclose(file);
 
     for (size_t idx = 0; idx < g_AppState.results_counter; ++idx) {
         CleanupResults(g_AppState.results + idx);
