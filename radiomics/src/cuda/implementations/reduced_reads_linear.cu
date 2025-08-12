@@ -14,7 +14,7 @@
 
 SOLUTION_DECL(10) {
     return CUDA_ASYNC_LAUNCH_SOLUTION(
-        calculate_coefficients_kernel,
-        calculate_meshDiameter_kernel
+        ShapeKernelSharedMemorySoa,
+        VolumetryKernelSoaMatrixBasedFullAtomicsReuseSameThreads
     );
 }

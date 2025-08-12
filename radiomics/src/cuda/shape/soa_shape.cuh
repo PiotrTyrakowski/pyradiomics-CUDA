@@ -4,7 +4,7 @@
 #include "tables.cuh"
 #include <cstddef>
 
-static __global__ void calculate_coefficients_kernel(
+static __global__ void ShapeKernelSharedMemorySoa(
     const char *mask, const int *size, const int *strides,
     const double *spacing, double *surfaceArea, double *volume,
     double *vertices, unsigned long long *vertex_count, size_t max_vertices) {

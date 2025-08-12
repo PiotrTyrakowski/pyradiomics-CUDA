@@ -123,7 +123,7 @@ int basic_cuda_launcher(
 
         /* Call the main kernel */
         START_MEASUREMENT(1, "Marching Cubes Kernel");
-        calculate_coefficients_kernel<<<gridSize, blockSize>>>(
+        ShapeKernelBasic<<<gridSize, blockSize>>>(
             mask_dev,
             size_dev,
             strides_dev,

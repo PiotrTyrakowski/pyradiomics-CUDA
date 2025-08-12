@@ -4,7 +4,7 @@
 #include "constants.cuh"
 #include "helpers.cuh"
 
-static __global__ void calculate_meshDiameter_kernel(
+static __global__ void VolumetryKernelSoaMatrixBasedFullAtomicsReuseSameThreads(
     const double *vertices,
     const size_t num_vertices,
     double *diameters_sq,

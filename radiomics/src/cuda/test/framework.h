@@ -53,6 +53,7 @@ typedef struct app_state {
     int detailed_flag;
     int no_errors_flag;
     int num_rep_tests;
+    int generate_csv;
 
     const char **input_files;
     size_t size_files;
@@ -100,6 +101,8 @@ AddErrorLog(test_result, log); \
 void CleanupResults(test_result_t *result);
 
 void DisplayResults(FILE *file, test_result_t *results, size_t results_size);
+
+void SetDataSize(uint64_t size);
 
 // ------------------------------
 // Core functions

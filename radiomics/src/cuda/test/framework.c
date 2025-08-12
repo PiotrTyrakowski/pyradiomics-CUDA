@@ -12,7 +12,7 @@
 #include <cshape.h>
 #include <math.h>
 
-#define TEST_ACCURACY (1e+8 * DBL_EPSILON)
+#define TEST_ACCURACY 0.000001
 
 // ------------------------------
 // Application state
@@ -23,6 +23,7 @@ app_state_t g_AppState = {
     .detailed_flag = 0,
     .no_errors_flag = 0,
     .num_rep_tests = 10,
+    .generate_csv = 0,
     .input_files = NULL,
     .size_files = 0,
     .output_file = "./out.txt",
@@ -30,6 +31,8 @@ app_state_t g_AppState = {
     .results_counter = 0,
     .current_test = NULL,
 };
+
+static uint64_t g_DataSize = 0;
 
 // ------------------------------
 // Static functions
@@ -282,17 +285,34 @@ static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
     }
 }
 
+static void DisplayFileDimensions_(FILE * file, data_ptr_t data) {
+    fprintf(file, "Image size: %dx%dx%d = %dB = %fKB = %fMB\n",
+        data->size[0],
+        data->size[1],
+        data->size[2],
+        data->size[0] * data->size[1] * data->size[2],
+        (double)(data->size[0] * data->size[1] * data->size[2] * sizeof(unsigned char)) / 1024.0,
+        (double)(data->size[0] * data->size[1] * data->size[2] * sizeof(unsigned char)) / (1024.0 * 1024.0)
+    );
+}
+
+static void DisplayFileDimensionsFile_(FILE * file, const char *input) {
+    data_ptr_t data = ParseData(input);
+    DisplayFileDimensions_(file, data);
+    CleanupData(data);
+}
+
 static void RunTest_(const char *input) {
     assert(input != NULL);
 
     printf("Processing test for file: %s\n", input);
-
     data_ptr_t data = ParseData(input);
 
     if (data == NULL) {
         TRACE_ERROR("Failed to parse data from file: %s", input);
         return;
     }
+    DisplayFileDimensions_(stdout, data);
 
     RunTestOnDefaultFunc_(data);
     for (size_t idx = 0; idx < MAX_SOL_FUNCTIONS; ++idx) {
@@ -336,6 +356,10 @@ static time_measurement_t *GetMeasurement_(test_result_t *result, const char *na
     return NULL;
 }
 
+void SetDataSize(uint64_t size) {
+    g_DataSize = size;
+}
+
 static uint64_t GetAverageTime_(const time_measurement_t *measurement) {
     assert(measurement->retries == g_AppState.num_rep_tests || measurement->retries == 1);
     return measurement->time_ns / measurement->retries;
@@ -353,7 +377,7 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
             continue;
         }
 
-        fprintf(file, "Function %lu: %s\n", id++, g_ShapeFunctionNames[i]);
+        fprintf(file, "Function %lu: %s\n", 1 + id++, g_ShapeFunctionNames[i]);
     }
     fprintf(file, "\n");
 
@@ -396,7 +420,6 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
             }
         }
 
-
         fputs("\n", file);
 
         if (i != test_sum - 1) {
@@ -404,7 +427,73 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
         }
     }
 
+    fputs("\n\n", file);
+
+    /* Print simple time table with ms values */
+    fprintf(file, "Time Table (milliseconds):\n");
+    fprintf(file, " Function       |");
+    for (size_t i = 0; i < test_sum; ++i) {
+        fprintf(file, " %14lu ", i);
+        if (i != test_sum - 1) {
+            fputs("|", file);
+        }
+    }
     fputs("\n", file);
+
+    PrintSeparator_(file, test_sum);
+    fprintf(file, " Time (ms)      |");
+
+    for (size_t i = 0; i < test_sum; ++i) {
+        const size_t result_idx = idx * test_sum + i;
+        const time_measurement_t *measurement = GetMeasurement_(results + result_idx, name);
+
+        if (measurement) {
+            const double time_ms = (double) GetAverageTime_(measurement) / 1000000.0; // Convert nanoseconds to milliseconds
+            fprintf(file, " %14.3f ", time_ms);
+        } else {
+            fprintf(file, " %14s ", "N/A");
+        }
+
+        if (i != test_sum - 1) {
+            fputs("|", file);
+        }
+    }
+
+    fputs("\n\n", file);
+
+    /* Print data size based table */
+    fprintf(file, "Number of vertices per second (1/ms):\n");
+    fprintf(file, " Function       |");
+    for (size_t i = 0; i < test_sum; ++i) {
+        fprintf(file, " %14lu ", i);
+        if (i != test_sum - 1) {
+            fputs("|", file);
+        }
+    }
+    fputs("\n", file);
+
+    PrintSeparator_(file, test_sum);
+    fprintf(file, " Vert/ms (1/ms) |");
+
+    for (size_t i = 0; i < test_sum; ++i) {
+        const size_t result_idx = idx * test_sum + i;
+        const time_measurement_t *measurement = GetMeasurement_(results + result_idx, name);
+
+        if (measurement) {
+            const double time_ms = (double) GetAverageTime_(measurement) / 1000000.0; // Convert nanoseconds to milliseconds
+            const double data_size = (double) g_DataSize;
+            const double ver_per_ms = data_size / time_ms;
+            fprintf(file, " %14.3f ", ver_per_ms);
+        } else {
+            fprintf(file, " %14s ", "N/A");
+        }
+
+        if (i != test_sum - 1) {
+            fputs("|", file);
+        }
+    }
+
+    fputs("\n\n", file);
 }
 
 static int ShouldPrint_(const char **names, size_t *top, const char *name) {
@@ -443,6 +532,46 @@ static void DisplayAllMatricesIfNeeded_(FILE *file, size_t idx) {
                 DisplayPerfMatrix_(file, g_AppState.results, g_AppState.results_counter, idx, measurement->name);
             }
         }
+    }
+}
+
+static void GenerateCsv_(FILE* file, test_result_t *results, size_t results_size) {
+    const size_t test_sum = GetTestCount_();
+    if (results_size == 0 || test_sum == 0) {
+        return;
+    }
+
+    // Generate header
+    fprintf(file, "data_input,pyradiomics");
+    size_t custom_func_count = 0;
+    for (size_t i = 0; i < MAX_SOL_FUNCTIONS; ++i) {
+        if (g_ShapeFunctions[i] != NULL) {
+            fprintf(file, ",%s", g_ShapeFunctionNames[i]);
+            custom_func_count++;
+        }
+    }
+    fprintf(file, "\n");
+
+    // Generate data rows
+    const size_t num_files = results_size / test_sum;
+    for (size_t file_idx = 0; file_idx < num_files; ++file_idx) {
+        fprintf(file, "%s", g_AppState.input_files[file_idx]);
+
+        for (size_t test_idx = 0; test_idx < test_sum; ++test_idx) {
+            const size_t result_idx = file_idx * test_sum + test_idx;
+            test_result_t *result = &results[result_idx];
+            const time_measurement_t *measurement = GetMeasurement_(result, MAIN_MEASUREMENT_NAME);
+
+            fprintf(file, ",");
+            if (measurement) {
+                const uint64_t avg_time_ns = GetAverageTime_(measurement);
+                const double time_ms = (double)avg_time_ns / 1000000.0;
+                fprintf(file, "%f", time_ms);
+            } else {
+                fprintf(file, "N/A");
+            }
+        }
+        fprintf(file, "\n");
     }
 }
 
@@ -497,6 +626,8 @@ void ParseCLI(int argc, const char **argv) {
             g_AppState.num_rep_tests = retries;
         } else if (strcmp(argv[i], "--no-errors") == 0) {
             g_AppState.no_errors_flag = 1;
+        } else if (strcmp(argv[i], "--csv") == 0) {
+            g_AppState.generate_csv = 1;
         } else {
             FailApplication("Unknown option provided");
         }
@@ -504,6 +635,12 @@ void ParseCLI(int argc, const char **argv) {
 }
 
 void DisplayHelp() {
+#ifdef NDEBUG
+    printf("TEST_APP (Release Build)\n");
+#else
+    printf("TEST_APP (Debug Build)\n");
+#endif
+
     printf(
         "TEST_APP -f|--files <list of input files>  [-v|--verbose] [-o|--output] [-d|--detailed] [-r|--retries <number>]<filename = out.txt>\n"
         "\n"
@@ -524,12 +661,30 @@ void FinalizeTesting() {
         FailApplication("Failed to open output file...");
     }
 
+    FILE *csv_file = NULL;
+    if (g_AppState.generate_csv) {
+        char *csv_filename = (char *) malloc(strlen(g_AppState.output_file) + 5);
+        snprintf(csv_filename, strlen(g_AppState.output_file) + 5, "%s.csv", g_AppState.output_file);
+        csv_file = fopen(csv_filename, "w");
+        free(csv_filename);
+
+        if (csv_file == NULL) {
+            FailApplication("Failed to open CSV output file...");
+        }
+    }
+
     DisplayResults(file, g_AppState.results, g_AppState.results_counter);
 
     /* Write results to stdout */
     DisplayResults(stdout, g_AppState.results, g_AppState.results_counter);
 
+    if (g_AppState.generate_csv) {
+        GenerateCsv_(csv_file, g_AppState.results, g_AppState.results_counter);
+        fclose(csv_file);
+    }
+
     free(g_AppState.input_files);
+    fclose(file);
 
     for (size_t idx = 0; idx < g_AppState.results_counter; ++idx) {
         CleanupResults(g_AppState.results + idx);
@@ -566,7 +721,9 @@ void DisplayResults(FILE *file, test_result_t *results, size_t results_size) {
             fputs("\n", file);
 
             const char *filename = g_AppState.input_files[idx / test_sum];
-            fprintf(file, "Test directory: %s\n\n", filename);
+            fprintf(file, "Test directory: %s\n", filename);
+            DisplayFileDimensionsFile_(file, filename);
+            fprintf(file, "\n");
 
             DisplayPerfMatrix_(file, results, results_size, idx / test_sum, MAIN_MEASUREMENT_NAME);
             DisplayAllMatricesIfNeeded_(file, idx / test_sum);

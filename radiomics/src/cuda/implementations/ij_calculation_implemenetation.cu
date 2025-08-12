@@ -13,6 +13,6 @@
 // ------------------------------
 
 SOLUTION_DECL(4) {
-  return CUDA_BASIC_LAUNCH_SOLUTION(calculate_coefficients_kernel,
-                                    calculate_meshDiameter_kernel);
+  return CUDA_BASIC_LAUNCH_SOLUTION(ShapeKernelBasic,
+                                    VolumetryKernelEqualWorkDistribution);
 }

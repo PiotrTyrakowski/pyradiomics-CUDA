@@ -70,3 +70,4 @@ target/
 
 # Cuda tests
 tmp_cfg.json
+.idea
