@@ -12,7 +12,7 @@
 #include <cshape.h>
 #include <math.h>
 
-#define TEST_ACCURACY (1e+8 * DBL_EPSILON)
+#define TEST_ACCURACY 0.000001
 
 // ------------------------------
 // Application state
@@ -284,17 +284,34 @@ static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
     }
 }
 
+static void DisplayFileDimensions_(FILE * file, data_ptr_t data) {
+    fprintf(file, "Image size: %dx%dx%d = %dB = %fKB = %fMB\n",
+        data->size[0],
+        data->size[1],
+        data->size[2],
+        data->size[0] * data->size[1] * data->size[2],
+        (double)(data->size[0] * data->size[1] * data->size[2] * sizeof(unsigned char)) / 1024.0,
+        (double)(data->size[0] * data->size[1] * data->size[2] * sizeof(unsigned char)) / (1024.0 * 1024.0)
+    );
+}
+
+static void DisplayFileDimensionsFile_(FILE * file, const char *input) {
+    data_ptr_t data = ParseData(input);
+    DisplayFileDimensions_(file, data);
+    CleanupData(data);
+}
+
 static void RunTest_(const char *input) {
     assert(input != NULL);
 
     printf("Processing test for file: %s\n", input);
-
     data_ptr_t data = ParseData(input);
 
     if (data == NULL) {
         TRACE_ERROR("Failed to parse data from file: %s", input);
         return;
     }
+    DisplayFileDimensions_(stdout, data);
 
     RunTestOnDefaultFunc_(data);
     for (size_t idx = 0; idx < MAX_SOL_FUNCTIONS; ++idx) {
@@ -643,7 +660,9 @@ void DisplayResults(FILE *file, test_result_t *results, size_t results_size) {
             fputs("\n", file);
 
             const char *filename = g_AppState.input_files[idx / test_sum];
-            fprintf(file, "Test directory: %s\n\n", filename);
+            fprintf(file, "Test directory: %s\n", filename);
+            DisplayFileDimensionsFile_(file, filename);
+            fprintf(file, "\n");
 
             DisplayPerfMatrix_(file, results, results_size, idx / test_sum, MAIN_MEASUREMENT_NAME);
             DisplayAllMatricesIfNeeded_(file, idx / test_sum);

@@ -53,6 +53,7 @@ typedef struct app_state {
     int detailed_flag;
     int no_errors_flag;
     int num_rep_tests;
+    int generate_csv;
 
     const char **input_files;
     size_t size_files;
