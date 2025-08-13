@@ -2,6 +2,7 @@ import os
 import datetime
 import numpy as np
 import collections
+import argparse
 from radiomics import getFeatureClasses, imageoperations
 
 from radiomics.featureextractor import RadiomicsFeatureExtractor
@@ -9,7 +10,7 @@ from radiomics.featureextractor import RadiomicsFeatureExtractor
 def _write_shape_class_to_file(shapeClass, out_dir, base_dir=None):
   """
   Write shape class atributes to separate files in a date-based folder.
-  
+
   Args:
     shapeClass: The shape class instance containing feature values
     base_dir: Base directory to create the date folder in (default: current directory)
@@ -22,23 +23,23 @@ def _write_shape_class_to_file(shapeClass, out_dir, base_dir=None):
       output_dir = os.path.join("data", out_dir)
     # Ensure the directory exists
     os.makedirs(output_dir, exist_ok=True)
-    
+
     # Write 3 text files for different features
     with open(os.path.join(output_dir, "surface_area.txt"), 'w') as f:
       f.write(f"{shapeClass.SurfaceArea}")
-    
+
     with open(os.path.join(output_dir, "volume.txt"), 'w') as f:
       f.write(f"{shapeClass.Volume}")
-    
+
     with open(os.path.join(output_dir, "diameters.txt"), 'w') as f:
       f.write(f"{shapeClass.diameters}")
-    
+
     # Save pixel_spacing as binary NumPy file instead of text
     np.save(os.path.join(output_dir, "pixel_spacing.npy"), shapeClass.pixelSpacing)
-    
+
     # Write mask array as binary file
     np.save(os.path.join(output_dir, "mask_array.npy"), shapeClass.maskArray)
-    
+
     print(f"Shape features successfully written to {output_dir}")
 
     return output_dir
@@ -97,9 +98,10 @@ def load_shape_class(folder_path):
     return None
 
 class RadiomicsFeatureWriter(RadiomicsFeatureExtractor):
-  def __init__(self, base_dir=None):
+  def __init__(self, base_dir=None, prefix="data"):
     super().__init__()
     self.base_dir = base_dir
+    self.prefix = prefix
     self.out_dirs = []
     self.idx = 0
 
@@ -114,7 +116,7 @@ class RadiomicsFeatureWriter(RadiomicsFeatureExtractor):
         raise RuntimeError("Shape features are only implemented for 3D images.")
 
       shapeClass = getFeatureClasses()['shape'](croppedImage, croppedMask, **kwargs)
-      output = _write_shape_class_to_file(shapeClass, f"data_{self.idx}", self.base_dir)
+      output = _write_shape_class_to_file(shapeClass, f"{self.prefix}_{self.idx}", self.base_dir)
       self.out_dirs.append(output)
 
     if 'shape2D' in enabledFeatures.keys():
@@ -159,8 +161,8 @@ DEFAULT_CONFIG="""
 }
 """
 
-def write_shape_class(mask_path, scan_path, max_idx, base_dir = None, config_path = None):
-  extractor = RadiomicsFeatureWriter(base_dir)
+def write_shape_class(mask_path, scan_path, max_idx, base_dir=None, config_path=None, prefix="data"):
+  extractor = RadiomicsFeatureWriter(base_dir, prefix)
 
   if config_path is None:
     config_path = os.path.join(os.curdir, "tmp_cfg.json")
@@ -174,19 +176,70 @@ def write_shape_class(mask_path, scan_path, max_idx, base_dir = None, config_pat
 
   return extractor.get_saved_dirs()
 
+def parse_arguments():
+  """Parse command line arguments."""
+  parser = argparse.ArgumentParser(
+    description="Extract and save radiomics shape features from medical images.",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter
+  )
+
+  parser.add_argument(
+    "-m", "--mask-path",
+    required=True,
+    help="Path to the mask file"
+  )
+
+  parser.add_argument(
+    "-s", "--scan-path",
+    required=True,
+    help="Path to the scan/image file"
+  )
+
+  parser.add_argument(
+    "-n", "--max-idx",
+    type=int,
+    required=True,
+    help="Maximum index for processing (will process indices 1 to max_idx)"
+  )
+
+  parser.add_argument(
+    "-o", "--output-dir",
+    default=None,
+    help="Base output directory for saving features (default: current directory)"
+  )
+
+  parser.add_argument(
+    "-c", "--config-path",
+    default=None,
+    help="Path to custom configuration file (default: uses built-in config)"
+  )
+
+  parser.add_argument(
+    "-p", "--prefix",
+    default="data",
+    help="Prefix for output folder names (will create folders like PREFIX_1, PREFIX_2, etc.)"
+  )
+
+  return parser.parse_args()
+
 if __name__ == "__main__":
-  import sys
+  args = parse_arguments()
 
-  if len(sys.argv) != 4 and len(sys.argv) != 5:
-    print("Usage: python data_transform.py <mask_path> <scan_path> <max_idx>")
-    sys.exit(1)
+  # Create output directory if specified and doesn't exist
+  if args.output_dir is not None:
+    os.makedirs(args.output_dir, exist_ok=True)
 
-  mask_path = sys.argv[1]
-  scan_path = sys.argv[2]
-  max_idx = int(sys.argv[3])
-  base_dir = sys.argv[4] if len(sys.argv) == 5 else None
+  # Extract features
+  output_dirs = write_shape_class(
+    mask_path=args.mask_path,
+    scan_path=args.scan_path,
+    max_idx=args.max_idx,
+    base_dir=args.output_dir,
+    config_path=args.config_path,
+    prefix=args.prefix
+  )
 
-  if base_dir is not None:
-    os.makedirs(base_dir, exist_ok=True)
-
-  write_shape_class(mask_path, scan_path, max_idx, base_dir)
+  print(f"\nProcessing completed successfully!")
+  print(f"Created {len(output_dirs)} output directories:")
+  for dir_path in output_dirs:
+    print(f"  - {dir_path}")
