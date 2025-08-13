@@ -12,7 +12,7 @@
 // Host wrapper
 // ------------------------------
 
-SOLUTION_DECL(9) {
+SOLUTION_DECL(7) {
     return CUDA_SQUARE_LAUNCH_SOLUTION(
         ShapeKernelSharedMemorySoa,
         VolumetryKernelSoaMatrixBasedAccumulatorsFinalAtomic

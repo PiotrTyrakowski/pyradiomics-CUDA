@@ -32,6 +32,10 @@ app_state_t g_AppState = {
     .current_test = NULL,
 };
 
+static uint64_t g_DataSizeCounter[MAX_SOL_FUNCTIONS] = {0};
+static uint64_t g_DataSizeReg[MAX_SOL_FUNCTIONS][32] = {0};
+static uint64_t g_FileSize[32] = {0};
+
 static uint64_t g_DataSize = 0;
 
 // ------------------------------
@@ -283,6 +287,21 @@ static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
         assert(data->is_result_provided);
         ValidateResult_(test_result, data, &result);
     }
+
+    const uint64_t counter = g_DataSizeCounter[idx]++;
+    g_DataSizeReg[idx][counter] = g_DataSize;
+
+    if (idx > 0) {
+        const uint64_t prev_size = g_DataSizeReg[idx - 1][counter];
+        if (prev_size != g_DataSize && prev_size != 0) {
+            PREPARE_ERROR_LOG(
+                "Data size mismatch",
+                "Expected: %lu, Got: %lu",
+                prev_size,
+                g_DataSize
+            );
+        }
+    }
 }
 
 static void DisplayFileDimensions_(FILE * file, data_ptr_t data) {
@@ -302,9 +321,10 @@ static void DisplayFileDimensionsFile_(FILE * file, const char *input) {
     CleanupData(data);
 }
 
-static void RunTest_(const char *input) {
+static void RunTest_(const uint64_t idx) {
     assert(input != NULL);
 
+    const char* input = g_AppState.input_files[idx];
     printf("Processing test for file: %s\n", input);
     data_ptr_t data = ParseData(input);
 
@@ -313,6 +333,7 @@ static void RunTest_(const char *input) {
         return;
     }
     DisplayFileDimensions_(stdout, data);
+    g_FileSize[idx] = data->size[0] * data->size[1] * data->size[2];
 
     RunTestOnDefaultFunc_(data);
     for (size_t idx = 0; idx < MAX_SOL_FUNCTIONS; ++idx) {
@@ -481,7 +502,8 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
 
         if (measurement) {
             const double time_ms = (double) GetAverageTime_(measurement) / 1000000.0; // Convert nanoseconds to milliseconds
-            const double data_size = (double) g_DataSize;
+            const uint64_t vertices = g_DataSizeReg[i][idx];
+            const double data_size = (double) vertices;
             const double ver_per_ms = data_size / time_ms;
             fprintf(file, " %14.3f ", ver_per_ms);
         } else {
@@ -542,7 +564,7 @@ static void GenerateCsv_(FILE* file, test_result_t *results, size_t results_size
     }
 
     // Generate header
-    fprintf(file, "data_input,pyradiomics");
+    fprintf(file, "data_input,space_size,vertices,pyradiomics");
     size_t custom_func_count = 0;
     for (size_t i = 0; i < MAX_SOL_FUNCTIONS; ++i) {
         if (g_ShapeFunctions[i] != NULL) {
@@ -555,7 +577,7 @@ static void GenerateCsv_(FILE* file, test_result_t *results, size_t results_size
     // Generate data rows
     const size_t num_files = results_size / test_sum;
     for (size_t file_idx = 0; file_idx < num_files; ++file_idx) {
-        fprintf(file, "%s", g_AppState.input_files[file_idx]);
+        fprintf(file, "%s,%zu, %zu", g_AppState.input_files[file_idx], g_FileSize[file_idx], g_DataSizeReg[0][file_idx]);
 
         for (size_t test_idx = 0; test_idx < test_sum; ++test_idx) {
             const size_t result_idx = file_idx * test_sum + test_idx;
@@ -698,7 +720,7 @@ void RunTests() {
     TRACE_INFO("Processing %zu input files...", g_AppState.size_files);
 
     for (size_t i = 0; i < g_AppState.size_files; ++i) {
-        RunTest_(g_AppState.input_files[i]);
+        RunTest_(i);
     }
 }
 
