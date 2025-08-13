@@ -12,7 +12,7 @@
 // Host wrapper
 // ------------------------------
 
-SOLUTION_DECL(10) {
+SOLUTION_DECL(9) {
     return CUDA_ASYNC_LAUNCH_SOLUTION(
         ShapeKernelSharedMemorySoa,
         VolumetryKernelSoaMatrixBasedFullAtomicsReuseSameThreads

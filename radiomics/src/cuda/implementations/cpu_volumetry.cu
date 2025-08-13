@@ -210,7 +210,7 @@ cleanup:
 // Host wrapper
 // ------------------------------
 
-SOLUTION_DECL(7) {
+SOLUTION_DECL(20) {
     return basic_cuda_launcher(
         mask,
         size,
