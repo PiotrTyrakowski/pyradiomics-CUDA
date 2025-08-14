@@ -32,10 +32,10 @@ app_state_t g_AppState = {
     .current_test = NULL,
 };
 
+#define MAX_FILES 512
 static uint64_t g_DataSizeCounter[MAX_SOL_FUNCTIONS] = {0};
-static uint64_t g_DataSizeReg[MAX_SOL_FUNCTIONS][32] = {0};
-static uint64_t g_FileSize[32] = {0};
-
+static uint64_t g_DataSizeReg[MAX_SOL_FUNCTIONS][MAX_FILES] = {0};
+static uint64_t g_FileSize[MAX_FILES] = {0};
 static uint64_t g_DataSize = 0;
 
 // ------------------------------
