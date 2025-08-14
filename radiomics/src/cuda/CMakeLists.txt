@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.29)
+cmake_minimum_required(VERSION 3.1)
 project(CancerSolver CUDA C)
 
 set(CMAKE_CUDA_STANDARD 17)
