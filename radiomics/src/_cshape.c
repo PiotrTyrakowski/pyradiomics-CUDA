@@ -5,6 +5,10 @@
 #include <numpy/arrayobject.h>
 #include "cshape.h"
 
+#ifdef CUDA_EXTENSIONS_ENABLED
+#include "cuda/cshape.cuh"
+#endif
+
 static char module_docstring[] = "This module links to C-compiled code for efficient calculation of the surface area "
                                  "in the pyRadiomics package. It provides fast calculation using a marching cubes "
                                  "algortihm, accessed via ""calculate_surfacearea"". Arguments for this function"
@@ -98,6 +102,7 @@ static PyObject *cshape_calculate_coefficients(PyObject *self, PyObject *args)
   double SA, Volume;
   double diameters[4];
   PyObject *diameter_obj;
+  int result;
 
   // Parse the input tuple
   if (!PyArg_ParseTuple(args, "OO", &mask_obj, &spacing_obj))
@@ -114,7 +119,18 @@ static PyObject *cshape_calculate_coefficients(PyObject *self, PyObject *args)
   spacing = (double *)PyArray_DATA(spacing_arr);
 
   //Calculate Surface Area and volume
-  if (calculate_coefficients(mask, size, strides, spacing, &SA, &Volume, diameters))
+#ifdef CUDA_EXTENSIONS_ENABLED
+  if (IsCudaAvailable()) {
+    result = cuda_calculate_coefficients(mask, size, strides, spacing, &SA, &Volume, diameters);
+  } else {
+    /* Fallback to CPU solution */
+    result = calculate_coefficients(mask, size, strides, spacing, &SA, &Volume, diameters);
+  }
+#else
+  result = calculate_coefficients(mask, size, strides, spacing, &SA, &Volume, diameters);
+#endif // CUDA_EXTENSIONS_ENABLED
+
+  if (result)
   {
     // An error has occurred
     Py_XDECREF(mask_arr);
