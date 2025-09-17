@@ -1,11 +1,7 @@
 #ifndef ASYNC_STREAM_CUH
 #define ASYNC_STREAM_CUH
 
-#ifdef __cplusplus
-#define EXTERN extern "C"
-#else
-#define EXTERN
-#endif // __cplusplus
+#include "defines.cuh"
 
 EXTERN int AsyncInitStreamIfNeeded();
 EXTERN int AsyncDestroyStreamIfNeeded();
