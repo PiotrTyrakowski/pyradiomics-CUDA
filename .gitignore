@@ -60,6 +60,14 @@ docs/_build/
 # IDE junk
 .idea/*
 *.swp
+.vscode
 
 # PyBuilder
 target/
+
+# Python virtualenv
+.venv
+
+# Cuda tests
+tmp_cfg.json
+.idea
