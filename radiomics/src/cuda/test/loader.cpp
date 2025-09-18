@@ -13,7 +13,7 @@
 
 #include "debug_macros.h"
 
-#define TRACE_FILE_ERROR(message, ...)   ERROR("FILE:%s" message, filename_.c_str() __VA_OPT__(,) __VA_ARGS__)
+#define TRACE_FILE_ERROR(message, ...)   ERROR("FILE:%s " message, filename_.c_str() __VA_OPT__(,) __VA_ARGS__)
 
 // ------------------------------
 // Statics
@@ -260,18 +260,16 @@ static std::shared_ptr<TestData> processRawNumpyArrays(const ParsedNumpyArray &m
 std::shared_ptr<TestData> LoadNumpyArrays(const std::string &filename) {
     assert(!filename.empty());
     const std::filesystem::path dir(filename);
-    const std::filesystem::path mask_file = dir / "mask_arrays.npy";
-    const std::filesystem::path spacing_file = dir / "spacing_arrays.npy";
+    const std::filesystem::path mask_file = dir / "mask_array.npy";
+    const std::filesystem::path spacing_file = dir / "pixel_spacing.npy";
 
     const auto mask_parsed = NumpyReader(mask_file).parse();
     if (!mask_parsed) {
-        ERROR("Failed to parse mask_arrays.npy");
         return {};
     }
 
     const auto spacing_parsed = NumpyReader(spacing_file).parse();
     if (!spacing_parsed) {
-        ERROR("Failed to parse spacing_arrays.npy");
         return {};
     }
 

@@ -83,11 +83,11 @@ target_link_libraries(PYRADIOMICS PRIVATE ${Python3_LIBRARIES})
 # C test application
 # ------------------------------
 
-file(GLOB_RECURSE C_SOURCES
+file(GLOB_RECURSE CXX_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp"
 )
 
-add_executable(TEST_APP ${C_SOURCES})
+add_executable(TEST_APP ${CXX_SOURCES})
 
 target_include_directories(TEST_APP PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/test"
@@ -123,7 +123,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     )
 
     set_source_files_properties(
-            "${PYRADIOMICS_C};${C_SOURCES}"
+            "${PYRADIOMICS_C};${CXX_SOURCES}"
             PROPERTIES COMPILE_OPTIONS "-O3;-march=native"
     )
 
@@ -135,7 +135,7 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     )
 
     set_source_files_properties(
-            "${PYRADIOMICS_C};${C_SOURCES}"
+            "${PYRADIOMICS_C};${CXX_SOURCES}"
             PROPERTIES COMPILE_OPTIONS "-O2;-march=native;-g"
     )
 
@@ -147,7 +147,7 @@ else ()
     )
 
     set_source_files_properties(
-            "${PYRADIOMICS_C};${C_SOURCES}"
+            "${PYRADIOMICS_C};${CXX_SOURCES}"
             PROPERTIES COMPILE_OPTIONS "-O0;-g;-fno-omit-frame-pointer"
     )
 
