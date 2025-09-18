@@ -19,7 +19,7 @@ int IsCudaAvailable() {
     return is_available;
 }
 
-EXTERN int cuda_calculate_coefficients(char *mask, int *size, int *strides, double *spacing,
+C_DEF int cuda_calculate_coefficients(char *mask, int *size, int *strides, double *spacing,
                                        double *surfaceArea, double *volume, double *diameters) {
 
     return SOLUTION_NAME(7)(

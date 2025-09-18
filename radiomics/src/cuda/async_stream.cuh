@@ -3,12 +3,12 @@
 
 #include "defines.cuh"
 
-EXTERN int AsyncInitStreamIfNeeded();
-EXTERN int AsyncDestroyStreamIfNeeded();
+C_DEF int AsyncInitStreamIfNeeded();
+C_DEF int AsyncDestroyStreamIfNeeded();
 
 #ifdef CUDART_VERSION
 #include <cuda_runtime.h>
-EXTERN cudaStream_t* GetAsyncStream();
+C_DEF cudaStream_t* GetAsyncStream();
 #endif // CUDART_VERSION
 
 #endif //ASYNC_STREAM_CUH

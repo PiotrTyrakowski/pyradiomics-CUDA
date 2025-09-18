@@ -3,9 +3,9 @@
 
 #include "defines.cuh"
 
-EXTERN int IsCudaAvailable();
+C_DEF int IsCudaAvailable();
 
-EXTERN int cuda_calculate_coefficients(char *mask, int *size, int *strides, double *spacing,
+C_DEF int cuda_calculate_coefficients(char *mask, int *size, int *strides, double *spacing,
                            double *surfaceArea, double *volume, double *diameters);
 
 #endif //CSHAPE_CUH

@@ -2,12 +2,7 @@
 #define CANCERSOLVER_TEST_CUH
 
 #include <stdlib.h>
-
-#ifdef __cplusplus
-#define EXTERN extern "C"
-#else
-#define EXTERN
-#endif // __cplusplus
+#include "defines.cuh"
 
 #define MAX_SOL_FUNCTIONS (size_t)(32)
 
@@ -31,12 +26,13 @@ typedef int (*shape_2D_func_t)(
         double *diameter
 );
 
-EXTERN void CleanGPUCache();
+C_DEF void CleanGPUCache();
+C_DEF void RegisterSolutions();
+
+C_EXTERN shape_func_t g_ShapeFunctions[MAX_SOL_FUNCTIONS];
+C_EXTERN const char* g_ShapeFunctionNames[MAX_SOL_FUNCTIONS];
 
 #ifdef __cplusplus
-
-extern "C" shape_func_t g_ShapeFunctions[MAX_SOL_FUNCTIONS];
-extern "C" const char* g_ShapeFunctionNames[MAX_SOL_FUNCTIONS];
 
 int AddShapeFunction(size_t idx, shape_func_t func, const char* name = nullptr);
 
@@ -49,15 +45,6 @@ int AddShapeFunction(size_t idx, shape_func_t func, const char* name = nullptr);
 
 #define REGISTER_SOLUTION(number, name) \
     AddShapeFunction(number, SOLUTION_NAME(number), name)
-
-extern "C" void RegisterSolutions();
-
-#else
-
-void RegisterSolutions();
-
-extern shape_func_t g_ShapeFunctions[MAX_SOL_FUNCTIONS];
-extern const char* g_ShapeFunctionNames[MAX_SOL_FUNCTIONS];
 
 #endif // __cplusplus
 

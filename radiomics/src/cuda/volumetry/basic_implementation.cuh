@@ -2,6 +2,7 @@
 #define VOLUMETRY_BASIC_IMPLEMENTATION_CUH_
 
 #include "helpers.cuh"
+#include "constants.cuh"
 
 static __global__ void VolumetryKernelBasic(
     const double
@@ -19,17 +20,17 @@ static __global__ void VolumetryKernelBasic(
     }
 
     // Get coordinates for the 'anchor' vertex 'a' assigned to this thread
-    double ax = vertices[tid * 3 + 0];
-    double ay = vertices[tid * 3 + 1];
-    double az = vertices[tid * 3 + 2];
+    double ax = vertices[tid * kVertexPosSize3D + 0];
+    double ay = vertices[tid * kVertexPosSize3D + 1];
+    double az = vertices[tid * kVertexPosSize3D + 2];
 
     // Compare vertex 'a' with all subsequent vertices 'b' to avoid redundant
     // calculations
     for (size_t j = tid + 1; j < num_vertices; ++j) {
         // Get coordinates for vertex 'b'
-        double bx = vertices[j * 3 + 0];
-        double by = vertices[j * 3 + 1];
-        double bz = vertices[j * 3 + 2];
+        double bx = vertices[j * kVertexPosSize3D + 0];
+        double by = vertices[j * kVertexPosSize3D + 1];
+        double bz = vertices[j * kVertexPosSize3D + 2];
 
         // Calculate squared differences in coordinates
         double dx = ax - bx;
@@ -38,24 +39,15 @@ static __global__ void VolumetryKernelBasic(
 
         // Calculate squared Euclidean distance
         double dist_sq = dx * dx + dy * dy + dz * dz;
-
-        // Atomically update the overall maximum squared diameter
         atomicMax(&diameters_sq[3], dist_sq);
 
-        // Atomically update plane-specific maximum squared diameters based on
-        // coordinate equality Note: Direct float comparison `==` is used here,
-        // matching the original C logic. This might be sensitive to precision
-        // issues.
         if (ax == bx) {
-            // If x-coordinates are equal (lies in a YZ plane)
             atomicMax(&diameters_sq[0], dist_sq);
         }
         if (ay == by) {
-            // If y-coordinates are equal (lies in an XZ plane)
             atomicMax(&diameters_sq[1], dist_sq);
         }
         if (az == bz) {
-            // If z-coordinates are equal (lies in an XY plane)
             atomicMax(&diameters_sq[2], dist_sq);
         }
     }
