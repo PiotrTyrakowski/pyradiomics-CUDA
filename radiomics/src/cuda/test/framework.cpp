@@ -9,8 +9,10 @@
 #include <errno.h>
 
 #include <test.cuh>
-#include <cshape.h>
 #include <math.h>
+
+extern "C" int calculate_coefficients(char *mask, int *size, int *strides, double *spacing,
+                           double *surfaceArea, double *volume, double *diameters);
 
 #define TEST_ACCURACY 0.000001
 
@@ -133,7 +135,10 @@ static void ParseResultData_(const char *filename, data_ptr_t data) {
             printf("[ ERROR ] Failed to open volume file: %s\n", volume_name);
         }
 
-        goto CLEANUP;
+        if (diameters_file != NULL) { fclose(diameters_file); }
+        if (surface_area_file != NULL) { fclose(surface_area_file); }
+        if (volume_file != NULL) { fclose(volume_file); }
+        return;
     }
 
     const int volume_read_result = ParseSingleDouble_(volume_file, &data->result.volume);
@@ -153,16 +158,18 @@ static void ParseResultData_(const char *filename, data_ptr_t data) {
             printf("[ ERROR ] Failed to parse diameters file: %s\n", diameters_name);
         }
 
-        goto CLEANUP;
+        if (diameters_file != NULL) { fclose(diameters_file); }
+        if (surface_area_file != NULL) { fclose(surface_area_file); }
+        if (volume_file != NULL) { fclose(volume_file); }
+        return;
     }
 
     /* Mark that result is provided */
     data->is_result_provided = 1;
 
-CLEANUP:
-    if (diameters_file != NULL) { fclose(diameters_file); }
-    if (surface_area_file != NULL) { fclose(surface_area_file); }
-    if (volume_file != NULL) { fclose(volume_file); }
+    fclose(diameters_file);
+    fclose(surface_area_file);
+    fclose(volume_file);
 }
 
 static void ValidateResult_(test_result_t *test_result, data_ptr_t data, result_t *result) {
@@ -188,7 +195,7 @@ static void ValidateResult_(test_result_t *test_result, data_ptr_t data, result_
         );
     }
 
-    for (size_t idx = 0; idx < DIAMETERS_SIZE; ++idx) {
+    for (size_t idx = 0; idx < kDiametersSize; ++idx) {
         if (fabs(result->diameters[idx] - data->result.diameters[idx]) > TEST_ACCURACY) {
             PREPARE_ERROR_LOG(
                 "diameters mismatch",

@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.12)
-project(CancerSolver CUDA C)
+project(CancerSolver CUDA CXX C)
 
-set(CMAKE_CUDA_STANDARD 17)
-set(CMAKE_C_STANDARD 17)
+set(CMAKE_CUDA_STANDARD 20)
+set(CMAKE_CXX_STANDARD 20)
 
 # ------------------------------
 # Find Python and NumPy (Virtual Environment Priority)
@@ -84,7 +84,7 @@ target_link_libraries(PYRADIOMICS PRIVATE ${Python3_LIBRARIES})
 # ------------------------------
 
 file(GLOB_RECURSE C_SOURCES
-        "${CMAKE_CURRENT_SOURCE_DIR}/test/*.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp"
 )
 
 add_executable(TEST_APP ${C_SOURCES})
@@ -105,11 +105,11 @@ target_link_libraries(TEST_APP PRIVATE
 # Flags config
 # ------------------------------
 
-if (CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     message(FATAL_ERROR "MSVC is unsupported...")
-elseif (CMAKE_C_COMPILER_ID STREQUAL "Clang")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     message(FATAL_ERROR "CLANG is unsupported...")
-elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     message(STATUS "Using GCC...")
 else ()
     message(FATAL_ERROR "Unsupported compiler.")
