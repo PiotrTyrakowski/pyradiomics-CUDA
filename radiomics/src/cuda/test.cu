@@ -4,7 +4,6 @@
 #include <stdlib.h>
 
 shape_func_t g_ShapeFunctions[MAX_SOL_FUNCTIONS]{};
-shape_2D_func_t g_Shape2DFunctions[MAX_SOL_FUNCTIONS]{};
 const char *g_ShapeFunctionNames[MAX_SOL_FUNCTIONS]{};
 
 int AddShapeFunction(size_t idx, shape_func_t func, const char *name) {
@@ -64,23 +63,6 @@ void CleanGPUCache() {
   polluteCaches<<<gridSize, blockSize>>>(d_buffer, bufferSize);
   cudaDeviceSynchronize();
   cudaFree(d_buffer);
-}
-
-int AddShape2DFunction(size_t idx, shape_2D_func_t func) {
-  if (idx >= MAX_SOL_FUNCTIONS) {
-    exit(EXIT_FAILURE);
-  }
-
-  if (g_Shape2DFunctions[idx] != NULL) {
-    exit(EXIT_FAILURE);
-  }
-
-  if (func == NULL) {
-    exit(EXIT_FAILURE);
-  }
-
-  g_Shape2DFunctions[idx] = func;
-  return (int)idx;
 }
 
 SOLUTION_DECL(0);

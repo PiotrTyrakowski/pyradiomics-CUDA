@@ -12,7 +12,7 @@ static int _IsCudaAvailable() {
 /* This file stands as interface to the CUDA code from pyradiomics library */
 
 /* Pick the best solution here */
-SOLUTION_DECL(0);
+SOLUTION_DECL(7);
 
 int IsCudaAvailable() {
     static const int is_available = _IsCudaAvailable();
@@ -22,7 +22,7 @@ int IsCudaAvailable() {
 EXTERN int cuda_calculate_coefficients(char *mask, int *size, int *strides, double *spacing,
                                        double *surfaceArea, double *volume, double *diameters) {
 
-    return SOLUTION_NAME(0)(
+    return SOLUTION_NAME(7)(
         mask,
         size,
         strides,
