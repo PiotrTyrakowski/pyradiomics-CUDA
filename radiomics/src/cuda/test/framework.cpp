@@ -329,8 +329,6 @@ static void DisplayFileDimensionsFile_(FILE * file, const char *input) {
 }
 
 static void RunTest_(const uint64_t idx) {
-    assert(input != NULL);
-
     const char* input = g_AppState.input_files[idx];
     printf("Processing test for file: %s\n", input);
     data_ptr_t data = ParseData(input);

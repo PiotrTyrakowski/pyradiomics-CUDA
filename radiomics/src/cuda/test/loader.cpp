@@ -291,7 +291,7 @@ int LoadNumpyArrays(const char* filename, data_t* const data) {
     std::memcpy(data->mask, test_data->mask.data(), test_data->mask.size());
 
     data->spacing = static_cast<double*>(std::malloc(sizeof(double) * test_data->spacing.size()));
-    std::memcpy(data->spacing, test_data->spacing.data(), test_data->spacing.size());
-
+    std::memcpy(data->spacing, test_data->spacing.data(), sizeof(double) * test_data->spacing.size());
+    
     return 0;
 }
