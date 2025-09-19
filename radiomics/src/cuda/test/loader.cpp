@@ -97,29 +97,29 @@ private:
             return std::nullopt;
         }
 
-        if (strstr(dtype_str, "<f8") || strstr(dtype_str, "float64")) {
-            return 8; // For float64
-        }
-        if (strstr(dtype_str, "<f4") || strstr(dtype_str, "float32")) {
-            return 4; // For float32
-        }
-        if (strstr(dtype_str, "<i8") || strstr(dtype_str, "int64")) {
-            return 8; // For int64
-        }
-        if (strstr(dtype_str, "<i4") || strstr(dtype_str, "int32")) {
-            return 4; // For int32
-        }
-        if (strstr(dtype_str, "<i2") || strstr(dtype_str, "int16")) {
-            return 2; // For int16
-        }
-        if (strstr(dtype_str, "<i1") || strstr(dtype_str, "int8")) {
-            return 1; // For int8
-        }
-        if (strstr(dtype_str, "|b1") || strstr(dtype_str, "bool")) {
-            return 1; // For bool
-        }
-        if (strstr(dtype_str, "|u1") || strstr(dtype_str, "uint8")) {
-            return 1; // For uint8
+        static constexpr auto kTypes = {
+            std::make_pair("<f8", 8),
+            std::make_pair("float64", 8),
+            std::make_pair("<f4", 4),
+            std::make_pair("float32", 4),
+            std::make_pair("<i8", 8),
+            std::make_pair("int64", 8),
+            std::make_pair("<i4", 4),
+            std::make_pair("int32", 4),
+            std::make_pair("<i2", 2),
+            std::make_pair("int16", 2),
+            std::make_pair("<i1", 1),
+            std::make_pair("int8", 1),
+            std::make_pair("|b1", 1),
+            std::make_pair("bool", 1),
+            std::make_pair("|u1", 1),
+            std::make_pair("uint8", 1),
+        };
+
+        for (const auto & [str, size] : kTypes) {
+            if (strstr(dtype_str, str)) {
+                return size;
+            }
         }
 
         TRACE_FILE_ERROR("Unsupported dtype");
@@ -292,6 +292,6 @@ int LoadNumpyArrays(const char* filename, data_t* const data) {
 
     data->spacing = static_cast<double*>(std::malloc(sizeof(double) * test_data->spacing.size()));
     std::memcpy(data->spacing, test_data->spacing.data(), sizeof(double) * test_data->spacing.size());
-    
+
     return 0;
 }
