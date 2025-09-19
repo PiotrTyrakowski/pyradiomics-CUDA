@@ -1,9 +1,10 @@
-#include "debug_macros.h"
-
 #include <string>
 #include <vector>
 #include <memory>
 #include <iostream>
+
+#include "debug_macros.h"
+#include "loader.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -113,7 +114,7 @@ static void FailApplication(const std::string& msg) {
 }
 
 template<typename... Args>
-void FailApplication(const char* fmt, Args&&... args) {
+static void FailApplication(const char* fmt, Args&&... args) {
     const int size = std::snprintf(nullptr, 0, fmt, std::forward<Args>(args)...);
     assert(size > 0);
 
@@ -132,8 +133,10 @@ void ParseCLI(const int argc, const char **argv) {
     }
 
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-f") == 0 || strcmp(argv[i], "--files") == 0) {
-            if (g_AppState.input_files != NULL) {
+        std::string arg = argv[i];
+
+        if (arg == "-f" || arg == "--files") {
+            if (!g_AppState.input_files.empty()) {
                 FailApplication("File flag provided twice...");
             }
 
@@ -141,42 +144,37 @@ void ParseCLI(const int argc, const char **argv) {
                 FailApplication("No input files specified after -f|--files.");
             }
 
-            g_AppState.size_files = 0;
-            g_AppState.input_files = (const char **) malloc(sizeof(char *) * (argc - i - 1));
-
             while (i + 1 < argc && argv[i + 1][0] != '-') {
-                g_AppState.input_files[g_AppState.size_files++] = argv[++i];
+                g_AppState.input_files.emplace_back(argv[++i]);
             }
-        } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
-            g_AppState.verbose_flag = 1;
-        } else if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) {
+        } else if (arg == "-v" || arg == "--verbose") {
+            g_AppState.verbose_flag = true;
+        } else if (arg == "-o" || arg == "--output") {
             if (i + 1 >= argc) {
                 FailApplication("No output filename specified after -o|--output.");
             }
             g_AppState.output_file = argv[++i];
-        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+        } else if (arg == "-h" || arg == "--help") {
             DisplayHelp();
-            exit(EXIT_SUCCESS);
-        } else if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--detailed") == 0) {
-            g_AppState.detailed_flag = 1;
-        } else if (strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--retries") == 0) {
+            std::exit(EXIT_SUCCESS);
+        } else if (arg == "-d" || arg == "--detailed") {
+            g_AppState.detailed_flag = true;
+        } else if (arg == "-r" || arg == "--retries") {
             if (i + 1 >= argc) {
                 FailApplication("No number of retries specified after -r|--retries.");
             }
 
-            const int retries = atoi(argv[++i]);
-
+            int retries = std::stoi(argv[++i]);
             if (retries <= 0) {
                 FailApplication("Invalid number of retries specified after -r|--retries.");
             }
-
-            g_AppState.num_rep_tests = retries;
-        } else if (strcmp(argv[i], "--no-errors") == 0) {
-            g_AppState.no_errors_flag = 1;
-        } else if (strcmp(argv[i], "--csv") == 0) {
-            g_AppState.generate_csv = 1;
+            g_AppState.num_rep_tests = static_cast<uint32_t>(retries);
+        } else if (arg == "--no-errors") {
+            g_AppState.no_errors_flag = true;
+        } else if (arg == "--csv") {
+            g_AppState.generate_csv = true;
         } else {
-            FailApplication("Unknown option provided");
+            FailApplication("Unknown option provided: %s", arg.c_str());
         }
     }
 }
@@ -213,10 +211,6 @@ void CleanupResults(test_result_t * result);
 
 void DisplayResults(FILE *file, test_result_t *results, size_t results_size);
 
-void FailApplication(const char *msg);
-
-void DisplayHelp();
-
 test_result_t *AllocResults();
 
 #define PREPARE_TEST_RESULT(test_result, ...) \
@@ -225,8 +219,6 @@ char *name = (char *) malloc(256); \
 snprintf(name, 256, __VA_ARGS__); \
 test_result->function_name = name; \
 } while (0)
-
-data_ptr_t ParseData(const char *filename);
 
 // ------------------------------
 // Static functions
@@ -242,122 +234,6 @@ static size_t GetTestCount_() {
         }
     }
     return sum + 1;
-}
-
-static int ParseSingleDouble_(FILE *file, double *out_ptr) {
-    assert(file != NULL);
-    assert(out_ptr != NULL);
-
-    /* Check length of the file */
-    fseek(file, 0, SEEK_END);
-    const long length = ftell(file);
-
-    if (length == -1 || length > TOO_LONG_FILE_LENGTH) {
-        return 1;
-    }
-
-    /* read whole file */
-    fseek(file, 0, SEEK_SET);
-    char buffer[TOO_LONG_FILE_LENGTH];
-    if (fread(buffer, 1, length, file) != length) {
-        return 1;
-    }
-
-    errno = 0;
-    const double num = strtod(buffer, NULL);
-
-    if (errno != 0) {
-        return 1;
-    }
-
-    *out_ptr = num;
-    return 0;
-}
-
-static int ParseDiameters_(FILE *file, data_ptr_t data) {
-    assert(file != NULL);
-    assert(data != NULL);
-
-    double values[4];
-    if (fscanf(file, "(%lf, %lf, %lf, %lf)",
-               data->result.diameters,
-               data->result.diameters + 1,
-               data->result.diameters + 2,
-               data->result.diameters + 3) != 4) {
-        return 1;
-    }
-
-    return 0; // Success
-}
-
-
-static void ParseResultData_(const char *filename, data_ptr_t data) {
-    assert(filename != NULL);
-    assert(data != NULL);
-
-    TRACE_INFO("Parsing result data for file: %s", filename);
-
-    char diameters_name[256];
-    snprintf(diameters_name, 256, "%s" FILE_PATH_SEPARATOR "diameters.txt", filename);
-
-    char surface_area_name[256];
-    snprintf(surface_area_name, 256, "%s" FILE_PATH_SEPARATOR "surface_area.txt", filename);
-
-    char volume_name[256];
-    snprintf(volume_name, 256, "%s" FILE_PATH_SEPARATOR "volume.txt", filename);
-
-    FILE *diameters_file = fopen(diameters_name, "r");
-    FILE *surface_area_file = fopen(surface_area_name, "r");
-    FILE *volume_file = fopen(volume_name, "r");
-
-    if (diameters_file == NULL || surface_area_file == NULL || volume_file == NULL) {
-        if (diameters_file == NULL) {
-            printf("[ ERROR ] Failed to open diameters file: %s\n", diameters_name);
-        }
-
-        if (surface_area_file == NULL) {
-            printf("[ ERROR ] Failed to open surface area file: %s\n", surface_area_name);
-        }
-
-        if (volume_file == NULL) {
-            printf("[ ERROR ] Failed to open volume file: %s\n", volume_name);
-        }
-
-        if (diameters_file != NULL) { fclose(diameters_file); }
-        if (surface_area_file != NULL) { fclose(surface_area_file); }
-        if (volume_file != NULL) { fclose(volume_file); }
-        return;
-    }
-
-    const int volume_read_result = ParseSingleDouble_(volume_file, &data->result.volume);
-    const int surface_area_read_result = ParseSingleDouble_(surface_area_file, &data->result.surface_area);
-    const int diameters_read_result = ParseDiameters_(diameters_file, data);
-
-    if (volume_read_result != 0 || surface_area_read_result != 0 || diameters_read_result != 0) {
-        if (volume_read_result != 0) {
-            printf("[ ERROR ] Failed to parse volume file: %s\n", volume_name);
-        }
-
-        if (surface_area_read_result != 0) {
-            printf("[ ERROR ] Failed to parse surface area file: %s\n", surface_area_name);
-        }
-
-        if (diameters_read_result != 0) {
-            printf("[ ERROR ] Failed to parse diameters file: %s\n", diameters_name);
-        }
-
-        if (diameters_file != NULL) { fclose(diameters_file); }
-        if (surface_area_file != NULL) { fclose(surface_area_file); }
-        if (volume_file != NULL) { fclose(volume_file); }
-        return;
-    }
-
-    /* Mark that result is provided */
-    data->is_result_provided = 1;
-
-    fclose(diameters_file);
-    fclose(surface_area_file);
-    fclose(volume_file);
 }
 
 static void ValidateResult_(test_result_t *test_result, data_ptr_t data, result_t *result) {
@@ -977,32 +853,5 @@ test_result_t *AllocResults() {
     return result;
 }
 
-test_result_t *GetOngoingTest() {
-    return g_AppState.current_test;
-}
 
-data_ptr_t ParseData(const char *filename) {
-    data_ptr_t data = (data_ptr_t) malloc(sizeof(data_t));
 
-    if (data == NULL) {
-        FailApplication("Failed to allocate memory for data...");
-    }
-
-    ParseResultData_(filename, data);
-    if (LoadNumpyArrays(filename, data)) {
-        /* LoadNumpyArrays should report errors */
-
-        free(data);
-        return NULL;
-    }
-
-    return data;
-}
-
-void CleanupData(data_ptr_t data) {
-    assert(data != NULL);
-
-    free(data->spacing);
-    free(data->mask);
-    free(data);
-}

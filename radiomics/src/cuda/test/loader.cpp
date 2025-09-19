@@ -194,6 +194,123 @@ private:
     std::ifstream file_{};
 };
 
+class ResultReader {
+public:
+    explicit ResultReader(std::string  dir) : dir_(std::move(dir)) {}
+
+    [[nodiscard]] bool ContainsNoResultFiles() const {
+        const std::filesystem::path dir(dir_);
+        const std::filesystem::path diameters_file = dir / "diameters.txt";
+        const std::filesystem::path surface_file = dir / "surface_area.txt";
+        const std::filesystem::path volume_file = dir / "volume.txt";
+
+        return !std::filesystem::exists(diameters_file) &&
+           !std::filesystem::exists(surface_file) &&
+           !std::filesystem::exists(volume_file);
+    }
+
+    [[nodiscard]] std::optional<Result> parse() {
+        const auto diameters = ParseDiameters_("diameters.txt");
+        if (!diameters) {
+            return std::nullopt;
+        }
+
+        const auto surface = ParseDouble_("surface_area.txt");
+        if (!surface) {
+            return std::nullopt;
+        }
+
+        const auto volume = ParseDouble_("volume.txt");
+        if (!volume) {
+            return std::nullopt;
+        }
+
+        Result result{};
+        result.volume = *volume;
+        result.diameters = *diameters;
+        result.surface_area = *surface;
+        return result;
+    }
+
+private:
+
+    [[nodiscard]] std::optional<double> ParseDouble_(const std::string& name) const {
+        static constexpr std::size_t kFileTooLong = 1024;
+
+        const std::filesystem::path dir(dir_);
+        const std::filesystem::path path = dir / name;
+
+        std::ifstream file(path.c_str(), std::ios::binary);
+        if (!file.is_open()) {
+            TRACE_ERROR("Failed to process result file: %s", path.c_str());
+            return std::nullopt;
+        }
+
+        file.seekg(0, std::ios::end);
+        const std::streamsize length = file.tellg();
+        if (length == -1) {
+            TRACE_ERROR("Failed to read result file: %s", path.c_str());
+            return std::nullopt;
+        }
+
+        if (static_cast<size_t>(length) > kFileTooLong) {
+            TRACE_ERROR("File too long: %s", path.c_str());
+            return std::nullopt;
+        }
+
+        file.seekg(0, std::ios::beg);
+        std::string content(length, '\0');
+        if (!file.read(content.data(), length)) {
+            TRACE_ERROR("Failed to read result file: %s", path.c_str());
+            return std::nullopt;
+        }
+
+        try {
+            size_t pos;
+            double num = std::stod(content, &pos);
+
+            if (pos != content.length()) {
+                TRACE_ERROR("File should contain only double value: %s", path.c_str());
+                return std::nullopt;
+            }
+
+            return num;
+        }
+        catch (const std::invalid_argument&) {
+            TRACE_ERROR("File contains invalid argument: %s", path.c_str());
+            return std::nullopt;
+        }
+        catch (const std::out_of_range&) {
+            TRACE_ERROR("File contains out of range value: %s", path.c_str());
+            return std::nullopt;
+        }
+    }
+
+    std::optional<std::array<double, kDiametersSize>> ParseDiameters_(const std::string& name) {
+        const std::filesystem::path dir(dir_);
+        const std::filesystem::path path = dir / name;
+
+        std::ifstream file(path.c_str(), std::ios::binary);
+        if (!file.is_open()) {
+            TRACE_ERROR("Failed to process result file: %s", path.c_str());
+            return std::nullopt;
+        }
+
+        std::array<double, 4> values{};
+        char c1, c2, c3, c4, c5;
+
+        if (file >> c1 >> values[0] >> c2 >> values[1] >> c3 >> values[2] >> c4 >> values[3] >> c5) {
+            if (c1 == '(' && c2 == ',' && c3 == ',' && c4 == ',' && c5 == ')') {
+                return values;
+            }
+        }
+
+        return std::nullopt;
+    }
+
+    std::string dir_;
+};
+
 static std::array<size_t, kDimensions3d> CalculateStrides(const ParsedNumpyArray& npy_array) {
     std::array<size_t, kDimensions3d> strides{};
 
@@ -273,5 +390,21 @@ std::shared_ptr<TestData> LoadNumpyArrays(const std::string &filename) {
         return {};
     }
 
-    return processRawNumpyArrays(*mask_parsed, *spacing_parsed);
+    auto test_data = processRawNumpyArrays(*mask_parsed, *spacing_parsed);
+    if (!test_data) {
+        return {};
+    }
+
+    ResultReader result_reader(filename);
+    if (result_reader.ContainsNoResultFiles()) {
+        return test_data;
+    }
+
+    auto result = result_reader.parse();
+    if (!result) {
+        return {};
+    }
+
+    test_data->result = result;
+    return test_data;
 }

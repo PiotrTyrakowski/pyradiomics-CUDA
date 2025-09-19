@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <optional>
 
 // ------------------------------
 // defines
@@ -27,8 +28,7 @@ struct TestData {
     std::array<size_t, kDimensions3d> size;
     std::array<size_t, kDimensions3d> strides;
 
-    bool is_result_provided;
-    Result result;
+    std::optional<Result> result;
 };
 
 // ------------------------------
