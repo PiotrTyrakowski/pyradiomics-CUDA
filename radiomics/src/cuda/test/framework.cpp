@@ -1,37 +1,74 @@
-#include "framework.h"
-#include "debug_macros.h"  // Include the new debug macros
+#include "debug_macros.h"
+
+#include <string>
+#include <vector>
+#include <memory>
+#include <iostream>
 
 #include <assert.h>
 #include <stdio.h>
 #include <memory.h>
 #include <time.h>
-#include <float.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 #include <test.cuh>
 #include <math.h>
 
 extern "C" int calculate_coefficients(char *mask, int *size, int *strides, double *spacing,
-                           double *surfaceArea, double *volume, double *diameters);
+                                      double *surfaceArea, double *volume, double *diameters);
 
-#define TEST_ACCURACY 0.000001
+// ------------------------------
+// defines
+// ------------------------------
+
+struct time_measurement {
+    uint64_t time_ns{};
+    std::string name{};
+    uint32_t retries{};
+};
+
+struct error_log {
+    std::string name{};
+    std::string value{};
+};
+
+struct test_result {
+    std::string function_name{};
+    std::vector<time_measurement> measurements{};
+    std::vector<error_log> error_logs{};
+};
+
+struct app_state {
+    bool verbose_flag{};
+    bool detailed_flag{};
+    bool no_errors_flag{};
+    std::uint32_t num_rep_tests{};
+    bool generate_csv{};
+
+    std::vector<std::string> input_files{};
+    std::string output_file{};
+    std::vector<test_result> results{};
+};
+
+static constexpr auto kFilePathSeparator = "/";
+static constexpr auto kMainMeasurementName = "Full execution time";
+static constexpr double kTestAccuracy = 0.000001;
 
 // ------------------------------
 // Application state
 // ------------------------------
 
-app_state_t g_AppState = {
-    .verbose_flag = 0,
-    .detailed_flag = 0,
-    .no_errors_flag = 0,
+app_state g_AppState = {
+    .verbose_flag = false,
+    .detailed_flag = false,
+    .no_errors_flag = false,
     .num_rep_tests = 10,
-    .generate_csv = 0,
-    .input_files = NULL,
-    .size_files = 0,
+    .generate_csv = false,
+    .input_files = {},
     .output_file = "./out.txt",
     .results = {},
-    .results_counter = 0,
-    .current_test = NULL,
 };
 
 #define MAX_FILES 512
@@ -39,6 +76,157 @@ static uint64_t g_DataSizeCounter[MAX_SOL_FUNCTIONS] = {0};
 static uint64_t g_DataSizeReg[MAX_SOL_FUNCTIONS][MAX_FILES] = {0};
 static uint64_t g_FileSize[MAX_FILES] = {0};
 static uint64_t g_DataSize = 0;
+
+// ------------------------------
+// Static functions declarations
+// ------------------------------
+
+// ------------------------------
+// Static functions implementation
+// ------------------------------
+
+static void DisplayHelp() {
+#ifdef NDEBUG
+    std::cout << "TEST_APP (Release Build)" << std::endl;
+#else
+    std::cout << "TEST_APP (Debug Build)" << std::endl;
+#endif
+    std::cout << "Compiled on: " << __DATE__ << " at " << __TIME__ << std::endl;
+
+    std::cout <<
+        "TEST_APP -f|--files <list of input files>  [-v|--verbose] [-o|--output] [-d|--detailed] [-r|--retries <number>]<filename = out.txt>\n"
+        "\n"
+        "Where:\n"
+        "-f|--files    - list of input data, for each file separate test will be conducted,\n"
+        "-v|--verbose  - enables live printing of test progress and various information to the stdout,\n"
+        "-o|--output   - file to which all results will be saved,\n"
+        "-d|--detailed - enables detailed output of test results to the stdout,\n"
+        "-r|--retries  - number of retries for each test, default is 10,\n"
+        "--no-errors   - disable error printing on results,"
+    << std::endl;
+}
+
+static void FailApplication(const std::string& msg) {
+    std::cerr << "[ ERROR ] Application failed due to error: " << msg << std::endl;
+    DisplayHelp();
+    std::exit(EXIT_FAILURE);
+}
+
+template<typename... Args>
+void FailApplication(const char* fmt, Args&&... args) {
+    const int size = std::snprintf(nullptr, 0, fmt, std::forward<Args>(args)...);
+    assert(size > 0);
+
+    std::string result(size, '\0');
+    std::snprintf(result.data(), result.size() + 1, fmt, std::forward<Args>(args)...);
+    FailApplication(result);
+}
+
+// ------------------------------
+// External functions implementation
+// ------------------------------
+
+void ParseCLI(const int argc, const char **argv) {
+    if (argc < 2) {
+        FailApplication("No -f|--files flag provided...");
+    }
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-f") == 0 || strcmp(argv[i], "--files") == 0) {
+            if (g_AppState.input_files != NULL) {
+                FailApplication("File flag provided twice...");
+            }
+
+            if (i + 1 >= argc) {
+                FailApplication("No input files specified after -f|--files.");
+            }
+
+            g_AppState.size_files = 0;
+            g_AppState.input_files = (const char **) malloc(sizeof(char *) * (argc - i - 1));
+
+            while (i + 1 < argc && argv[i + 1][0] != '-') {
+                g_AppState.input_files[g_AppState.size_files++] = argv[++i];
+            }
+        } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
+            g_AppState.verbose_flag = 1;
+        } else if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) {
+            if (i + 1 >= argc) {
+                FailApplication("No output filename specified after -o|--output.");
+            }
+            g_AppState.output_file = argv[++i];
+        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            DisplayHelp();
+            exit(EXIT_SUCCESS);
+        } else if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--detailed") == 0) {
+            g_AppState.detailed_flag = 1;
+        } else if (strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--retries") == 0) {
+            if (i + 1 >= argc) {
+                FailApplication("No number of retries specified after -r|--retries.");
+            }
+
+            const int retries = atoi(argv[++i]);
+
+            if (retries <= 0) {
+                FailApplication("Invalid number of retries specified after -r|--retries.");
+            }
+
+            g_AppState.num_rep_tests = retries;
+        } else if (strcmp(argv[i], "--no-errors") == 0) {
+            g_AppState.no_errors_flag = 1;
+        } else if (strcmp(argv[i], "--csv") == 0) {
+            g_AppState.generate_csv = 1;
+        } else {
+            FailApplication("Unknown option provided");
+        }
+    }
+}
+
+
+// ======// ======// ======// ======// ======// ======// ======// ======// ======
+
+// ------------------------------
+// func declarations
+// ------------------------------
+
+template<typename... Args>
+void StartMeasurement(const std::size_t id, const char* fmt, Args&&... args) {
+    const int size = std::snprintf(nullptr, 0, fmt, std::forward<Args>(args)...);
+    assert(size > 0);
+
+    std::string result(size, '\0');
+    std::snprintf(result.data(), result.size() + 1, fmt, std::forward<Args>(args)...);
+    StartMeasurement(id, result);
+}
+
+void AddErrorLog(test_result_t *result, error_log_t log);
+
+#define PREPARE_ERROR_LOG(error_name, ...) \
+do { \
+error_log_t log; \
+log.name = error_name; \
+log.value = (char *) malloc(256); \
+snprintf(log.value, 256, __VA_ARGS__); \
+AddErrorLog(test_result, log); \
+} while (0)
+
+void CleanupResults(test_result_t * result);
+
+void DisplayResults(FILE *file, test_result_t *results, size_t results_size);
+
+void FailApplication(const char *msg);
+
+void DisplayHelp();
+
+test_result_t *AllocResults();
+
+#define PREPARE_TEST_RESULT(test_result, ...) \
+do { \
+char *name = (char *) malloc(256); \
+snprintf(name, 256, __VA_ARGS__); \
+test_result->function_name = name; \
+} while (0)
+
+data_ptr_t ParseData(const char *filename);
 
 // ------------------------------
 // Static functions
@@ -311,25 +499,25 @@ static void RunTestOnFunc_(data_ptr_t data, const size_t idx) {
     }
 }
 
-static void DisplayFileDimensions_(FILE * file, data_ptr_t data) {
+static void DisplayFileDimensions_(FILE *file, data_ptr_t data) {
     fprintf(file, "Image size: %dx%dx%d = %dB = %fKB = %fMB\n",
-        data->size[0],
-        data->size[1],
-        data->size[2],
-        data->size[0] * data->size[1] * data->size[2],
-        (double)(data->size[0] * data->size[1] * data->size[2] * sizeof(unsigned char)) / 1024.0,
-        (double)(data->size[0] * data->size[1] * data->size[2] * sizeof(unsigned char)) / (1024.0 * 1024.0)
+            data->size[0],
+            data->size[1],
+            data->size[2],
+            data->size[0] * data->size[1] * data->size[2],
+            (double) (data->size[0] * data->size[1] * data->size[2] * sizeof(unsigned char)) / 1024.0,
+            (double) (data->size[0] * data->size[1] * data->size[2] * sizeof(unsigned char)) / (1024.0 * 1024.0)
     );
 }
 
-static void DisplayFileDimensionsFile_(FILE * file, const char *input) {
+static void DisplayFileDimensionsFile_(FILE *file, const char *input) {
     data_ptr_t data = ParseData(input);
     DisplayFileDimensions_(file, data);
     CleanupData(data);
 }
 
 static void RunTest_(const uint64_t idx) {
-    const char* input = g_AppState.input_files[idx];
+    const char *input = g_AppState.input_files[idx];
     printf("Processing test for file: %s\n", input);
     data_ptr_t data = ParseData(input);
 
@@ -474,7 +662,8 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
         const time_measurement_t *measurement = GetMeasurement_(results + result_idx, name);
 
         if (measurement) {
-            const double time_ms = (double) GetAverageTime_(measurement) / 1000000.0; // Convert nanoseconds to milliseconds
+            const double time_ms = (double) GetAverageTime_(measurement) / 1000000.0;
+            // Convert nanoseconds to milliseconds
             fprintf(file, " %14.3f ", time_ms);
         } else {
             fprintf(file, " %14s ", "N/A");
@@ -506,7 +695,8 @@ static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t result
         const time_measurement_t *measurement = GetMeasurement_(results + result_idx, name);
 
         if (measurement) {
-            const double time_ms = (double) GetAverageTime_(measurement) / 1000000.0; // Convert nanoseconds to milliseconds
+            const double time_ms = (double) GetAverageTime_(measurement) / 1000000.0;
+            // Convert nanoseconds to milliseconds
             const uint64_t vertices = g_DataSizeReg[i][idx];
             const double data_size = (double) vertices;
             const double ver_per_ms = data_size / time_ms;
@@ -562,7 +752,7 @@ static void DisplayAllMatricesIfNeeded_(FILE *file, size_t idx) {
     }
 }
 
-static void GenerateCsv_(FILE* file, test_result_t *results, size_t results_size) {
+static void GenerateCsv_(FILE *file, test_result_t *results, size_t results_size) {
     const size_t test_sum = GetTestCount_();
     if (results_size == 0 || test_sum == 0) {
         return;
@@ -582,7 +772,8 @@ static void GenerateCsv_(FILE* file, test_result_t *results, size_t results_size
     // Generate data rows
     const size_t num_files = results_size / test_sum;
     for (size_t file_idx = 0; file_idx < num_files; ++file_idx) {
-        fprintf(file, "%s,%zu, %zu", g_AppState.input_files[file_idx], g_FileSize[file_idx], g_DataSizeReg[0][file_idx]);
+        fprintf(file, "%s,%zu, %zu", g_AppState.input_files[file_idx], g_FileSize[file_idx],
+                g_DataSizeReg[0][file_idx]);
 
         for (size_t test_idx = 0; test_idx < test_sum; ++test_idx) {
             const size_t result_idx = file_idx * test_sum + test_idx;
@@ -592,7 +783,7 @@ static void GenerateCsv_(FILE* file, test_result_t *results, size_t results_size
             fprintf(file, ",");
             if (measurement) {
                 const uint64_t avg_time_ns = GetAverageTime_(measurement);
-                const double time_ms = (double)avg_time_ns / 1000000.0;
+                const double time_ms = (double) avg_time_ns / 1000000.0;
                 fprintf(file, "%f", time_ms);
             } else {
                 fprintf(file, "N/A");
@@ -606,80 +797,7 @@ static void GenerateCsv_(FILE* file, test_result_t *results, size_t results_size
 // Implementation
 // ------------------------------
 
-void ParseCLI(int argc, const char **argv) {
-    if (argc < 2) {
-        FailApplication("No -f|--files flag provided...");
-    }
 
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-f") == 0 || strcmp(argv[i], "--files") == 0) {
-            if (g_AppState.input_files != NULL) {
-                FailApplication("File flag provided twice...");
-            }
-
-            if (i + 1 >= argc) {
-                FailApplication("No input files specified after -f|--files.");
-            }
-
-            g_AppState.size_files = 0;
-            g_AppState.input_files = (const char **) malloc(sizeof(char *) * (argc - i - 1));
-
-            while (i + 1 < argc && argv[i + 1][0] != '-') {
-                g_AppState.input_files[g_AppState.size_files++] = argv[++i];
-            }
-        } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
-            g_AppState.verbose_flag = 1;
-        } else if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) {
-            if (i + 1 >= argc) {
-                FailApplication("No output filename specified after -o|--output.");
-            }
-            g_AppState.output_file = argv[++i];
-        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-            DisplayHelp();
-            exit(EXIT_SUCCESS);
-        } else if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--detailed") == 0) {
-            g_AppState.detailed_flag = 1;
-        } else if (strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--retries") == 0) {
-            if (i + 1 >= argc) {
-                FailApplication("No number of retries specified after -r|--retries.");
-            }
-
-            const int retries = atoi(argv[++i]);
-
-            if (retries <= 0) {
-                FailApplication("Invalid number of retries specified after -r|--retries.");
-            }
-
-            g_AppState.num_rep_tests = retries;
-        } else if (strcmp(argv[i], "--no-errors") == 0) {
-            g_AppState.no_errors_flag = 1;
-        } else if (strcmp(argv[i], "--csv") == 0) {
-            g_AppState.generate_csv = 1;
-        } else {
-            FailApplication("Unknown option provided");
-        }
-    }
-}
-
-void DisplayHelp() {
-#ifdef NDEBUG
-    printf("TEST_APP (Release Build)\n");
-#else
-    printf("TEST_APP (Debug Build)\n");
-#endif
-
-    printf(
-        "TEST_APP -f|--files <list of input files>  [-v|--verbose] [-o|--output] [-d|--detailed] [-r|--retries <number>]<filename = out.txt>\n"
-        "\n"
-        "Where:\n"
-        "-f|--files    - list of input data, for each file separate test will be conducted,\n"
-        "-v|--verbose  - enables live printing of test progress and various information to the stdout,\n"
-        "-o|--output   - file to which all results will be saved,\n"
-        "-d|--detailed - enables detailed output of test results to the stdout,\n"
-        "-r|--retries  - number of retries for each test, default is 10,\n"
-        "--no-errors   - disable error printing on results,\n"
-    );
-}
 
 void FinalizeTesting() {
     /* Write Result to output file */
@@ -733,11 +851,7 @@ int IsVerbose() {
     return g_AppState.verbose_flag;
 }
 
-void FailApplication(const char *msg) {
-    fprintf(stderr, "[ ERROR ] Application failed due to error: %s\n", msg);
-    DisplayHelp();
-    exit(EXIT_FAILURE);
-}
+
 
 void DisplayResults(FILE *file, test_result_t *results, size_t results_size) {
     const size_t test_sum = GetTestCount_();

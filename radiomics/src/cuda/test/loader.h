@@ -32,37 +32,9 @@ struct TestData {
 };
 
 // ------------------------------
-// Old C-defines
-// ------------------------------
-
-typedef struct result {
-    /* Results */
-
-    double surface_area;
-    double volume;
-    double diameters[kDiametersSize];
-} result_t;
-
-typedef struct data {
-    /* Arguments */
-    char *mask;
-    double *spacing;
-
-    int size[kDimensions3d];
-    int strides[kDimensions3d];
-
-    unsigned char is_result_provided;
-    result_t result;
-} data_t;
-
-typedef data_t *data_ptr_t;
-
-// ------------------------------
 // Core functions
 // ------------------------------
 
 std::shared_ptr<TestData> LoadNumpyArrays(const std::string& filename);
-
-int LoadNumpyArrays(const char* filename, data_ptr_t data);
 
 #endif //LOADER_H

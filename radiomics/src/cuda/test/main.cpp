@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <framework.h>
-#include "async_stream.cuh"
+#include <async_stream.cuh>
+#include <stdlib.h>
 
 int main(const int argc, const char **argv) {
     /* Initialize stream to remove penalty in tests */

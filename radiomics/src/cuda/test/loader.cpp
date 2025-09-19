@@ -275,23 +275,3 @@ std::shared_ptr<TestData> LoadNumpyArrays(const std::string &filename) {
 
     return processRawNumpyArrays(*mask_parsed, *spacing_parsed);
 }
-
-int LoadNumpyArrays(const char* filename, data_t* const data) {
-    const auto test_data = LoadNumpyArrays(filename);
-    if (!test_data) {
-        return 1;
-    }
-
-    for (std::size_t i = 0; i < kDimensions3d; ++i) {
-        data->size[i] = static_cast<int>(test_data->size[i]);
-        data->strides[i] = static_cast<int>(test_data->strides[i]);
-    }
-
-    data->mask = static_cast<char*>(std::malloc(sizeof(char) * test_data->mask.size()));
-    std::memcpy(data->mask, test_data->mask.data(), test_data->mask.size());
-
-    data->spacing = static_cast<double*>(std::malloc(sizeof(double) * test_data->spacing.size()));
-    std::memcpy(data->spacing, test_data->spacing.data(), sizeof(double) * test_data->spacing.size());
-
-    return 0;
-}

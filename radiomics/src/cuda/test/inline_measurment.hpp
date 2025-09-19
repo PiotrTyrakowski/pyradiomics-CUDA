@@ -5,13 +5,11 @@
 
 #include "test/framework.h"
 
-#define START_MEASUREMENT(idx, ...) \
-    time_measurement measurement_##idx; \
-    PREPARE_DATA_MEASUREMENT(measurement_##idx, __VA_ARGS__)
+#define START_MEASUREMENT(idx, name) \
+    StartMeasurement(idx, name)
 
 #define END_MEASUREMENT(idx) \
-    EndMeasurement(&measurement_##idx); \
-    AddDataMeasurement(GetOngoingTest(), measurement_##idx)
+    EndMeasurement(idx)
 
 #else
 #define START_MEASUREMENT(idx, name) (void)0
