@@ -313,10 +313,11 @@ private:
 
 static std::array<size_t, kDimensions3d> CalculateStrides(const ParsedNumpyArray& npy_array) {
     std::array<size_t, kDimensions3d> strides{};
+    assert(npy_array.dimensions.size() == kDimensions3d);
 
     // Strides are calculated from the innermost dimension outwards
-    strides[npy_array.dimensions.size() - 1] = npy_array.dTypeSize;
-    for (auto i = static_cast<signed long long>(npy_array.dimensions.size()) - 2; i >= 0; i--) {
+    strides[kDimensions3d - 1] = npy_array.dTypeSize;
+    for (auto i = static_cast<signed long long>(kDimensions3d) - 2; i >= 0; i--) {
         strides[i] = strides[i + 1] * npy_array.dimensions[i + 1];
     }
 

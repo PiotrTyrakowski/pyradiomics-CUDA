@@ -1,7 +1,6 @@
 #ifndef HELPERS_CUH
 #define HELPERS_CUH
 
-
 // Note: Native double atomicAdd requires Compute Capability 6.0+.
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
 __device__ inline double atomicAdd(double *address, double val) {

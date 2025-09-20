@@ -450,7 +450,7 @@ static void DisplayResults_(std::ostream &os) {
 // ------------------------------
 
 static void ValidateResult_(const Result &result, const std::shared_ptr<TestData> &data) {
-    assert(test_data);
+    assert(data);
 
     if (fabs(result.surface_area - data->result->surface_area) > kTestAccuracy) {
         AddErrorLog_(
@@ -535,7 +535,7 @@ static void RunTestOnFunc_(const std::shared_ptr<TestData> &data, const size_t i
         );
         EndMeasurement(kMainMeasurementName);
 
-        assert(data->is_result_provided);
+        assert(data);
         ValidateResult_(result, data);
 
         /* Save this run vertex size */
@@ -641,6 +641,10 @@ void ParseCLI(const int argc, const char **argv) {
 
             while (i + 1 < argc && argv[i + 1][0] != '-') {
                 g_AppState.input_files.emplace_back(argv[++i]);
+            }
+
+            if (g_AppState.input_files.empty()) {
+                FailApplication_("Provided no input files...");
             }
         } else if (arg == "-v" || arg == "--verbose") {
             g_AppState.verbose_flag = true;
@@ -754,7 +758,7 @@ void EndMeasurement(const char *name) {
     const std::uint64_t time_spent_ns =
             std::chrono::high_resolution_clock::now().time_since_epoch().count() - measurement.time_ns;
 
-    measurement.total_time_ns = 0;
+    measurement.time_ns = 0;
     measurement.total_time_ns += time_spent_ns;
     measurement.retries++;
 
