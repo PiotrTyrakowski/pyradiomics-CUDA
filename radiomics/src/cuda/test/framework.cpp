@@ -62,15 +62,18 @@ struct TestFile {
 };
 
 struct AppState {
+    /* Flags */
     bool verbose_flag{};
     bool detailed_flag{};
     bool no_errors_flag{};
     std::uint32_t num_rep_tests{};
     bool generate_csv{};
 
+    /* Process components */
     std::vector<TestFile> input_files{};
     std::string output_file{};
     std::vector<TestResult> results{};
+    uint64_t curr_data_size{};
 };
 
 static constexpr auto kMainMeasurementName = "Full execution time";
@@ -91,12 +94,6 @@ AppState g_AppState = {
     .results = {},
 };
 
-static uint64_t g_DataSize = 0;
-
-// ------------------------------
-// Static functions declarations
-// ------------------------------
-
 // ------------------------------
 // Helper static functions
 // ------------------------------
@@ -107,7 +104,7 @@ static TestResult &GetCurrentTest_() {
 }
 
 template<typename... Args>
-static void AddErrorLog(const char *name, const char *fmt, Args &&... args) {
+static void AddErrorLog_(const char *name, const char *fmt, Args &&... args) {
     const int size = std::snprintf(nullptr, 0, fmt, std::forward<Args>(args)...);
     assert(size > 0);
 
@@ -119,7 +116,7 @@ static void AddErrorLog(const char *name, const char *fmt, Args &&... args) {
 }
 
 template<typename... Args>
-static TestResult &StartNewTest(const char *fmt, Args &&... args) {
+static TestResult &StartNewTest_(const char *fmt, Args &&... args) {
     const int size = std::snprintf(nullptr, 0, fmt, std::forward<Args>(args)...);
     assert(size > 0);
 
@@ -130,7 +127,7 @@ static TestResult &StartNewTest(const char *fmt, Args &&... args) {
     return g_AppState.results.back();
 }
 
-static void DisplayHelp() {
+static void DisplayHelp_() {
 #ifdef NDEBUG
     std::cout << "TEST_APP (Release Build)" << std::endl;
 #else
@@ -151,20 +148,20 @@ static void DisplayHelp() {
             << std::endl;
 }
 
-static void FailApplication(const std::string &msg) {
+static void FailApplication_(const std::string &msg) {
     std::cerr << "[ ERROR ] Application failed due to error: " << msg << std::endl;
-    DisplayHelp();
+    DisplayHelp_();
     std::exit(EXIT_FAILURE);
 }
 
 template<typename... Args>
-static void FailApplication(const char *fmt, Args &&... args) {
+static void FailApplication_(const char *fmt, Args &&... args) {
     const int size = std::snprintf(nullptr, 0, fmt, std::forward<Args>(args)...);
     assert(size > 0);
 
     std::string result(size, '\0');
     std::snprintf(result.data(), result.size() + 1, fmt, std::forward<Args>(args)...);
-    FailApplication(result);
+    FailApplication_(result);
 }
 
 static std::size_t GetTestCount_() {
@@ -203,8 +200,8 @@ static bool ShouldPrint_(std::vector<std::string_view> &printed_matrices, const 
 // ------------------------------
 
 static void DisplayFileDimensions_(std::ostream &os, const TestFile &file) {
-    const size_t totalElements = file.size[0] * file.size[1] * file.size[2];
-    const size_t totalBytes = totalElements * sizeof(unsigned char);
+    const std::size_t totalElements = file.size[0] * file.size[1] * file.size[2];
+    const std::size_t totalBytes = totalElements * sizeof(unsigned char);
 
     os << "Image size: "
             << file.size[0] << "x"
@@ -223,9 +220,8 @@ static void PrintSeparator_(std::ostream &os, const std::size_t columns) {
     os << std::string(16, '-') << '\n';
 }
 
-
-static void DisplayPerfMatrix_(std::ostream &os, size_t idx, const std::string_view &name) {
-    const size_t test_sum = GetTestCount_();
+static void DisplayPerfMatrix_(std::ostream &os, const std::size_t idx, const std::string_view &name) {
+    const std::size_t test_sum = GetTestCount_();
     os << "Performance Matrix for measurement " << name << "\n\n";
 
     /* Display descriptor table */
@@ -290,7 +286,7 @@ static void DisplayPerfMatrix_(std::ostream &os, size_t idx, const std::string_v
 
     /* Print simple timetable with ms values */
     os << "Time Table (milliseconds):\n" << " Function       |";
-    for (size_t i = 0; i < test_sum; ++i) {
+    for (std::size_t i = 0; i < test_sum; ++i) {
         os << " " << std::setw(14) << std::right << i << " ";
         if (i != test_sum - 1) {
             os << '|';
@@ -365,7 +361,7 @@ static void DisplayAllMatricesIfNeeded_(std::ostream &os, const std::size_t idx)
     const std::size_t test_sum = GetTestCount_();
 
     for (size_t i = idx * test_sum; i < idx * test_sum + test_sum; ++i) {
-        const auto& result = g_AppState.results[i];
+        const auto &result = g_AppState.results[i];
 
         for (const auto &[name, measurement]: result.measurements) {
             if (ShouldPrint_(printed_matrices, name)) {
@@ -409,7 +405,7 @@ static void GenerateCsv_(std::ostream &os) {
     }
 }
 
-static void DisplayResults(std::ostream &os) {
+static void DisplayResults_(std::ostream &os) {
     const size_t test_sum = GetTestCount_();
 
     for (size_t idx = 0; idx < g_AppState.results.size(); ++idx) {
@@ -455,7 +451,7 @@ static void ValidateResult_(const Result &result, const std::shared_ptr<TestData
     assert(test_data);
 
     if (fabs(result.surface_area - data->result->surface_area) > kTestAccuracy) {
-        AddErrorLog(
+        AddErrorLog_(
             "surface_area mismatch",
             "Expected: %0.9f, Got: %0.9f",
             data->result->surface_area,
@@ -464,7 +460,7 @@ static void ValidateResult_(const Result &result, const std::shared_ptr<TestData
     }
 
     if (fabs(result.volume - data->result->volume) > kTestAccuracy) {
-        AddErrorLog(
+        AddErrorLog_(
             "volume mismatch",
             "Expected: %0.9f, Got: %0.9f",
             data->result->volume,
@@ -474,7 +470,7 @@ static void ValidateResult_(const Result &result, const std::shared_ptr<TestData
 
     for (size_t idx = 0; idx < kDiametersSize; ++idx) {
         if (fabs(result.diameters[idx] - data->result->diameters[idx]) > kTestAccuracy) {
-            AddErrorLog(
+            AddErrorLog_(
                 "diameters mismatch",
                 "[Idx: %lu] Expected:  %0.9f, Got:  %0.9f",
                 idx,
@@ -489,7 +485,7 @@ static void RunTestOnDefaultFunc_(const std::shared_ptr<TestData> &data) {
     assert(data);
 
     TRACE_INFO("Running test on default function...");
-    StartNewTest("Pyradiomics implementation");
+    StartNewTest_("Pyradiomics implementation");
 
     Result result{};
 
@@ -519,7 +515,7 @@ static void RunTestOnFunc_(const std::shared_ptr<TestData> &data, const size_t i
     assert(data);
     TRACE_INFO("Running test on function with idx: %lu", idx);
 
-    StartNewTest("Custom implementation with idx: %lu and name \"%s\"", idx, g_ShapeFunctionNames[idx]);
+    StartNewTest_("Custom implementation with idx: %lu and name \"%s\"", idx, g_ShapeFunctionNames[idx]);
 
     for (int retry = 0; retry < g_AppState.num_rep_tests; ++retry) {
         Result result{};
@@ -541,14 +537,14 @@ static void RunTestOnFunc_(const std::shared_ptr<TestData> &data, const size_t i
         ValidateResult_(result, data);
 
         /* Save this run vertex size */
-        file.size_reports[idx].vertice_sizes.push_back(g_DataSize);
+        file.size_reports[idx].vertice_sizes.push_back(g_AppState.curr_data_size);
     }
 
     /* Check if there is always same result returned */
     for (std::size_t i = 0; i < file.size_reports[idx].vertice_sizes.size(); ++i) {
         for (std::size_t ii = i + 1; ii < file.size_reports[idx].vertice_sizes.size(); ++ii) {
             if (file.size_reports[idx].vertice_sizes[i] != file.size_reports[idx].vertice_sizes[ii]) {
-                AddErrorLog(
+                AddErrorLog_(
                     "Vertex size between run mismatch",
                     "Same tested function returned different vertex size: "
                     "%zu, %zu",
@@ -569,7 +565,7 @@ static void RunTestOnFunc_(const std::shared_ptr<TestData> &data, const size_t i
         !file.size_reports[idx].mismatch_found &&
         !file.size_reports[idx - 1].mismatch_found &&
         file.size_reports[idx].vertice_sizes.back() != file.size_reports[idx - 1].vertice_sizes.back()) {
-        AddErrorLog(
+        AddErrorLog_(
             "Vertex size between functions mismatch",
             "Vertex size returned by different functions differs: "
             "%zu, %zu",
@@ -603,15 +599,15 @@ static void RunTest_(TestFile &file) {
 
     /* Deduce vertice size */
     std::unordered_map<uint64_t, uint32_t> freq_map{};
-    for (const auto&[vertice_sizes, _] : file.size_reports) {
-        for (const auto& vert_size : vertice_sizes) {
+    for (const auto &[vertice_sizes, _]: file.size_reports) {
+        for (const auto &vert_size: vertice_sizes) {
             freq_map[vert_size]++;
         }
     }
 
     uint64_t most_accurate_vertex_size{};
     uint64_t max_freq{};
-    for (const auto& [vertex_size, freq] : freq_map) {
+    for (const auto &[vertex_size, freq]: freq_map) {
         if (freq > max_freq) {
             max_freq = freq;
             most_accurate_vertex_size = vertex_size;
@@ -626,7 +622,7 @@ static void RunTest_(TestFile &file) {
 
 void ParseCLI(const int argc, const char **argv) {
     if (argc < 2) {
-        FailApplication("No -f|--files flag provided...");
+        FailApplication_("No -f|--files flag provided...");
     }
 
     for (int i = 1; i < argc; i++) {
@@ -634,11 +630,11 @@ void ParseCLI(const int argc, const char **argv) {
 
         if (arg == "-f" || arg == "--files") {
             if (!g_AppState.input_files.empty()) {
-                FailApplication("File flag provided twice...");
+                FailApplication_("File flag provided twice...");
             }
 
             if (i + 1 >= argc) {
-                FailApplication("No input files specified after -f|--files.");
+                FailApplication_("No input files specified after -f|--files.");
             }
 
             while (i + 1 < argc && argv[i + 1][0] != '-') {
@@ -648,22 +644,22 @@ void ParseCLI(const int argc, const char **argv) {
             g_AppState.verbose_flag = true;
         } else if (arg == "-o" || arg == "--output") {
             if (i + 1 >= argc) {
-                FailApplication("No output filename specified after -o|--output.");
+                FailApplication_("No output filename specified after -o|--output.");
             }
             g_AppState.output_file = argv[++i];
         } else if (arg == "-h" || arg == "--help") {
-            DisplayHelp();
+            DisplayHelp_();
             std::exit(EXIT_SUCCESS);
         } else if (arg == "-d" || arg == "--detailed") {
             g_AppState.detailed_flag = true;
         } else if (arg == "-r" || arg == "--retries") {
             if (i + 1 >= argc) {
-                FailApplication("No number of retries specified after -r|--retries.");
+                FailApplication_("No number of retries specified after -r|--retries.");
             }
 
             const int retries = std::stoi(argv[++i]);
             if (retries <= 0) {
-                FailApplication("Invalid number of retries specified after -r|--retries.");
+                FailApplication_("Invalid number of retries specified after -r|--retries.");
             }
             g_AppState.num_rep_tests = static_cast<uint32_t>(retries);
         } else if (arg == "--no-errors") {
@@ -671,7 +667,7 @@ void ParseCLI(const int argc, const char **argv) {
         } else if (arg == "--csv") {
             g_AppState.generate_csv = true;
         } else {
-            FailApplication("Unknown option provided: %s", arg.c_str());
+            FailApplication_("Unknown option provided: %s", arg.c_str());
         }
     }
 }
@@ -681,19 +677,19 @@ void RunTests() {
 
     /* Verify working output file */
     if (!std::ofstream(g_AppState.output_file).is_open()) {
-        FailApplication("Unable to open output file.");
+        FailApplication_("Unable to open output file.");
     }
 
     /* Verify working input files */
     for (const auto &input_file: g_AppState.input_files) {
         if (!LoadNumpyArrays(input_file.file_name)) {
-            FailApplication("Failed to load input file: %s", input_file.file_name.c_str());
+            FailApplication_("Failed to load input file: %s", input_file.file_name.c_str());
         }
     }
 
     /* Verify working csv output if needed */
     if (g_AppState.generate_csv && !std::ofstream(g_AppState.output_file + ".csv").is_open()) {
-        FailApplication("Failed to create csv file: %s", g_AppState.output_file + ".csv");
+        FailApplication_("Failed to create csv file: %s", g_AppState.output_file + ".csv");
     }
 
     TRACE_INFO("Running tests in verbose mode...");
@@ -708,17 +704,17 @@ void FinalizeTesting() {
     /* Write Result to output file */
     std::ofstream outfile(g_AppState.output_file);
     if (!outfile.is_open()) {
-        FailApplication("Unable to open output file.");
+        FailApplication_("Unable to open output file.");
     }
 
 
-    DisplayResults(outfile);
-    DisplayResults(std::cout);
+    DisplayResults_(outfile);
+    DisplayResults_(std::cout);
 
     if (g_AppState.generate_csv) {
         std::ofstream csv_file(g_AppState.output_file + ".csv");
         if (!csv_file.is_open()) {
-            FailApplication("Unable to open csv file.");
+            FailApplication_("Unable to open csv file.");
         }
 
         GenerateCsv_(csv_file);
@@ -764,5 +760,5 @@ void EndMeasurement(const char *name) {
 }
 
 void SetDataSize(const uint64_t size) {
-    g_DataSize = size;
+    g_AppState.curr_data_size = size;
 }
