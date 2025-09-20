@@ -8,8 +8,8 @@
 // Measurement functions
 // ------------------------------
 
-void StartMeasurement(std::size_t id, const char* name);
-void EndMeasurement(std::size_t id);
+void StartMeasurement(const char* name);
+void EndMeasurement(const char* name);
 
 // ------------------------------
 // Core functions

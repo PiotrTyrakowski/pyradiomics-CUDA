@@ -59,7 +59,7 @@ int basic_cuda_launcher(
 ) {
     cudaError_t cudaStatus = cudaSuccess;
 
-    START_MEASUREMENT(0, "Data transfer");
+    START_MEASUREMENT("Data transfer");
 
     // --- Device Memory Pointers ---
     char *mask_dev = NULL;
@@ -112,7 +112,7 @@ int basic_cuda_launcher(
     CUDA_CHECK_GOTO(cudaMemcpy(spacing_dev, spacing, 3 * sizeof(double),
                         cudaMemcpyHostToDevice), cleanup);
 
-    END_MEASUREMENT(0);
+    END_MEASUREMENT("Data transfer");
 
     // --- 4. Launch Marching Cubes Kernel ---
     if (num_cubes > 0) {
@@ -122,7 +122,7 @@ int basic_cuda_launcher(
                       (size[0] - 1 + blockSize.z - 1) / blockSize.z);
 
         /* Call the main kernel */
-        START_MEASUREMENT(1, "Marching Cubes Kernel");
+        START_MEASUREMENT("Marching Cubes Kernel");
         ShapeKernelBasic<<<gridSize, blockSize>>>(
             mask_dev,
             size_dev,
@@ -138,7 +138,7 @@ int basic_cuda_launcher(
         CUDA_CHECK_GOTO(cudaGetLastError(), cleanup);
         CUDA_CHECK_GOTO(cudaDeviceSynchronize(), cleanup);
 
-        END_MEASUREMENT(1);
+        END_MEASUREMENT("Marching Cubes Kernel");
     }
 
     // --- 5. Copy Results (SA, Volume, vertex count) back to Host ---
@@ -160,7 +160,7 @@ int basic_cuda_launcher(
     }
 
     /* copy back to cpu */
-    START_MEASUREMENT(2, "Volumetric Kernel");
+    START_MEASUREMENT("Volumetric Kernel");
     if (vertex_count_host > 0) {
         size_t vertices_to_copy = vertex_count_host * 3 * sizeof(double);
 
@@ -179,7 +179,7 @@ int basic_cuda_launcher(
         diameters[3] = 0.0;
     }
 
-    END_MEASUREMENT(2);
+    END_MEASUREMENT("Volumetric Kernel");
 
 cleanup:
     if (mask_dev)

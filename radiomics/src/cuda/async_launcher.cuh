@@ -21,7 +21,7 @@ int async_cuda_launcher(
 ) {
     cudaError_t cudaStatus = cudaSuccess;
 
-    START_MEASUREMENT(0, "Async launcher Marching cube stage");
+    START_MEASUREMENT("Async launcher Marching cube stage");
 
     // Initialize the async stream if not already done
     AsyncInitStreamIfNeeded();
@@ -128,8 +128,8 @@ int async_cuda_launcher(
     // We need to synchronize here to ensure we have the vertex count
     CUDA_CHECK_GOTO(cudaStreamSynchronize(stream), cleanup);
 
-    END_MEASUREMENT(0);
-    START_MEASUREMENT(1, "Async launcher diameter stage");
+    END_MEASUREMENT("Async launcher Marching cube stage");
+    START_MEASUREMENT("Async launcher diameter stage");
 
     // Check if vertex buffer might have overflowed
     if (*vertex_count_host > max_possible_vertices) {
@@ -197,7 +197,7 @@ cleanup:
     if (vertex_count_host) CUDA_CHECK_EXIT(cudaFreeHost(vertex_count_host));
     if (diameters_sq_host) CUDA_CHECK_EXIT(cudaFreeHost(diameters_sq_host));
 
-    END_MEASUREMENT(1);
+    END_MEASUREMENT("Async launcher diameter stage");
 
     return cudaStatus == cudaSuccess ? 0 : 1;
 }
