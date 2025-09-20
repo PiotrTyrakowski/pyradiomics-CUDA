@@ -9,6 +9,7 @@
 #include <fstream>
 #include <cstring>
 #include <cmath>
+#include <iomanip>
 
 #include "debug_macros.h"
 #include "loader.h"
@@ -48,7 +49,8 @@ struct TestFile {
     }
 
     std::string file_name{};
-    uint64_t file_size_bytes{};
+    std::array<std::size_t, kDimensions3d> size{};
+    uint64_t size_bytes{};
     uint64_t file_size_vertices{};
 
     struct SizeReport {
@@ -71,7 +73,6 @@ struct AppState {
     std::vector<TestResult> results{};
 };
 
-static constexpr auto kFilePathSeparator = "/";
 static constexpr auto kMainMeasurementName = "Full execution time";
 static constexpr double kTestAccuracy = 0.000001;
 
@@ -182,300 +183,269 @@ static std::array<int, kDimensions3d> ConvertToIntArray_(const std::array<std::s
     return rv;
 }
 
-static int ShouldPrint_(const char **names, size_t *top, const char *name) {
-    if (strcmp(name, kMainMeasurementName) == 0) {
-        return 0;
+static bool ShouldPrint_(std::vector<std::string_view> &printed_matrices, const std::string_view &name) {
+    if (name == kMainMeasurementName) {
+        return false;
     }
 
-    for (size_t i = 0; i < *top; ++i) {
-        if (strcmp(names[i], name) == 0) {
-            return 0;
+    for (const auto &printed_matrix: printed_matrices) {
+        if (printed_matrix == name) {
+            return false;
         }
     }
 
-    names[*top] = name;
-    (*top)++;
-    return 1;
+    printed_matrices.push_back(name);
+    return true;
 }
 
 // ------------------------------
 // Display static functions
 // ------------------------------
 
-static void DisplayFileDimensions_(FILE *file, const std::shared_ptr<TestData> &data) {
-    fprintf(file, "Image size: %zux%zux%zu = %zuB = %fKB = %fMB\n",
-            data->size[0],
-            data->size[1],
-            data->size[2],
-            data->size[0] * data->size[1] * data->size[2],
-            static_cast<double>(data->size[0] * data->size[1] * data->size[2] * sizeof(unsigned char)) / 1024.0,
-            static_cast<double>(data->size[0] * data->size[1] * data->size[2] * sizeof(unsigned char)) / (
-                1024.0 * 1024.0)
-    );
+static void DisplayFileDimensions_(std::ostream &os, const TestFile &file) {
+    const size_t totalElements = file.size[0] * file.size[1] * file.size[2];
+    const size_t totalBytes = totalElements * sizeof(unsigned char);
+
+    os << "Image size: "
+            << file.size[0] << "x"
+            << file.size[1] << "x"
+            << file.size[2] << " = "
+            << totalElements << "B = "
+            << static_cast<double>(totalBytes) / 1024.0 << "KB = "
+            << static_cast<double>(totalBytes) / (1024.0 * 1024.0) << "MB"
+            << std::endl;
 }
 
-//
-// static void DisplayFileDimensionsFile_(FILE *file, const char *input) {
-//     data_ptr_t data = ParseData(input);
-//     DisplayFileDimensions_(file, data);
-//     CleanupData(data);
-// }
-//
-// static void PrintSeparator_(FILE *file, size_t columns) {
-//     for (size_t idx = 0; idx < columns; ++idx) {
-//         for (size_t i = 0; i < 16; ++i) {
-//             fputs("-", file);
-//         }
-//         fputs("+", file);
-//     }
-//     for (size_t i = 0; i < 16; ++i) {
-//         fputs("-", file);
-//     }
-//     fputs("\n", file);
-// }
-//
-// static void DisplayPerfMatrix_(FILE *file, test_result_t *results, size_t results_size, size_t idx, const char *name) {
-//     const size_t test_sum = GetTestCount_();
-//     fprintf(file, "Performance Matrix for measurement %s:\n\n", name);
-//
-//     /* Display descriptor table */
-//     fprintf(file, "Descriptor table:\n");
-//     size_t id = 0;
-//     for (size_t i = 0; i < MAX_SOL_FUNCTIONS; ++i) {
-//         if (g_ShapeFunctions[i] == NULL) {
-//             continue;
-//         }
-//
-//         fprintf(file, "Function %lu: %s\n", 1 + id++, g_ShapeFunctionNames[i]);
-//     }
-//     fprintf(file, "\n");
-//
-//     /* Print upper header - 16 char wide column */
-//     fputs(" row/col        |", file);
-//     for (size_t i = 0; i < test_sum; ++i) {
-//         fprintf(file, " %14lu ", i);
-//
-//         if (i != test_sum - 1) {
-//             fputs("|", file);
-//         }
-//     }
-//     fputs("\n", file);
-//
-//     PrintSeparator_(file, test_sum);
-//
-//     for (size_t i = 0; i < test_sum; ++i) {
-//         /* Print left header - 16 char wide column */
-//         fprintf(file, " %14lu |", i);
-//
-//         for (size_t ii = 0; ii < test_sum; ++ii) {
-//             /* Get full time measurement */
-//             const size_t row_idx = idx * test_sum + i;
-//             const size_t col_idx = idx * test_sum + ii;
-//
-//             const time_measurement_t *measurement_row = GetMeasurement_(results + row_idx, name);
-//             const time_measurement_t *measurement_col = GetMeasurement_(results + col_idx, name);
-//
-//             if (measurement_col && measurement_row) {
-//                 const double coef =
-//                         (double) GetAverageTime_(measurement_row) / (double) GetAverageTime_(measurement_col);
-//
-//                 fprintf(file, " %14.4f ", coef);
-//             } else {
-//                 fprintf(file, " %14s ", "N/A");
-//             }
-//
-//             if (ii != test_sum - 1) {
-//                 fputs("|", file);
-//             }
-//         }
-//
-//         fputs("\n", file);
-//
-//         if (i != test_sum - 1) {
-//             PrintSeparator_(file, test_sum);
-//         }
-//     }
-//
-//     fputs("\n\n", file);
-//
-//     /* Print simple time table with ms values */
-//     fprintf(file, "Time Table (milliseconds):\n");
-//     fprintf(file, " Function       |");
-//     for (size_t i = 0; i < test_sum; ++i) {
-//         fprintf(file, " %14lu ", i);
-//         if (i != test_sum - 1) {
-//             fputs("|", file);
-//         }
-//     }
-//     fputs("\n", file);
-//
-//     PrintSeparator_(file, test_sum);
-//     fprintf(file, " Time (ms)      |");
-//
-//     for (size_t i = 0; i < test_sum; ++i) {
-//         const size_t result_idx = idx * test_sum + i;
-//         const time_measurement_t *measurement = GetMeasurement_(results + result_idx, name);
-//
-//         if (measurement) {
-//             const double time_ms = (double) GetAverageTime_(measurement) / 1000000.0;
-//             // Convert nanoseconds to milliseconds
-//             fprintf(file, " %14.3f ", time_ms);
-//         } else {
-//             fprintf(file, " %14s ", "N/A");
-//         }
-//
-//         if (i != test_sum - 1) {
-//             fputs("|", file);
-//         }
-//     }
-//
-//     fputs("\n\n", file);
-//
-//     /* Print data size based table */
-//     fprintf(file, "Number of vertices per second (1/ms):\n");
-//     fprintf(file, " Function       |");
-//     for (size_t i = 0; i < test_sum; ++i) {
-//         fprintf(file, " %14lu ", i);
-//         if (i != test_sum - 1) {
-//             fputs("|", file);
-//         }
-//     }
-//     fputs("\n", file);
-//
-//     PrintSeparator_(file, test_sum);
-//     fprintf(file, " Vert/ms (1/ms) |");
-//
-//     for (size_t i = 0; i < test_sum; ++i) {
-//         const size_t result_idx = idx * test_sum + i;
-//         const time_measurement_t *measurement = GetMeasurement_(results + result_idx, name);
-//
-//         if (measurement) {
-//             const double time_ms = (double) GetAverageTime_(measurement) / 1000000.0;
-//             // Convert nanoseconds to milliseconds
-//             const uint64_t vertices = g_DataSizeReg[i][idx];
-//             const double data_size = (double) vertices;
-//             const double ver_per_ms = data_size / time_ms;
-//             fprintf(file, " %14.3f ", ver_per_ms);
-//         } else {
-//             fprintf(file, " %14s ", "N/A");
-//         }
-//
-//         if (i != test_sum - 1) {
-//             fputs("|", file);
-//         }
-//     }
-//
-//     fputs("\n\n", file);
-// }
-//
-// static void DisplayAllMatricesIfNeeded_(FILE *file, size_t idx) {
-//     if (!g_AppState.detailed_flag) {
-//         return;
-//     }
-//
-//     const char *printed_matrices[2 * MAX_MEASUREMENTS];
-//     size_t top = 0;
-//
-//     const size_t test_sum = GetTestCount_();
-//
-//     for (size_t i = idx * test_sum; i < idx * test_sum + test_sum; ++i) {
-//         const test_result_t *result = g_AppState.results + i;
-//
-//         for (size_t j = 0; j < result->measurement_counter; ++j) {
-//             const time_measurement_t *measurement = &result->measurements[j];
-//
-//             if (ShouldPrint_(printed_matrices, &top, measurement->name)) {
-//                 DisplayPerfMatrix_(file, g_AppState.results, g_AppState.results_counter, idx, measurement->name);
-//             }
-//         }
-//     }
-// }
-//
-// static void GenerateCsv_(FILE *file, test_result_t *results, size_t results_size) {
-//     const size_t test_sum = GetTestCount_();
-//     if (results_size == 0 || test_sum == 0) {
-//         return;
-//     }
-//
-//     // Generate header
-//     fprintf(file, "data_input,space_size,vertices,pyradiomics");
-//     size_t custom_func_count = 0;
-//     for (size_t i = 0; i < MAX_SOL_FUNCTIONS; ++i) {
-//         if (g_ShapeFunctions[i] != NULL) {
-//             fprintf(file, ",%s", g_ShapeFunctionNames[i]);
-//             custom_func_count++;
-//         }
-//     }
-//     fprintf(file, "\n");
-//
-//     // Generate data rows
-//     const size_t num_files = results_size / test_sum;
-//     for (size_t file_idx = 0; file_idx < num_files; ++file_idx) {
-//         fprintf(file, "%s,%zu, %zu", g_AppState.input_files[file_idx], g_FileSize[file_idx],
-//                 g_DataSizeReg[0][file_idx]);
-//
-//         for (size_t test_idx = 0; test_idx < test_sum; ++test_idx) {
-//             const size_t result_idx = file_idx * test_sum + test_idx;
-//             test_result_t *result = &results[result_idx];
-//             const time_measurement_t *measurement = GetMeasurement_(result, MAIN_MEASUREMENT_NAME);
-//
-//             fprintf(file, ",");
-//             if (measurement) {
-//                 const uint64_t avg_time_ns = GetAverageTime_(measurement);
-//                 const double time_ms = (double) avg_time_ns / 1000000.0;
-//                 fprintf(file, "%f", time_ms);
-//             } else {
-//                 fprintf(file, "N/A");
-//             }
-//         }
-//         fprintf(file, "\n");
-//     }
-// }
-//
-// static void DisplayResults(FILE *file, test_result_t *results, size_t results_size) {
-//     const size_t test_sum = GetTestCount_();
-//
-//     for (size_t idx = 0; idx < results_size; ++idx) {
-//         if (idx % test_sum == 0) {
-//             for (size_t i = 0; i < 24; ++i) { fputs("=====", file); }
-//             fputs("\n", file);
-//
-//             const char *filename = g_AppState.input_files[idx / test_sum];
-//             fprintf(file, "Test directory: %s\n", filename);
-//             DisplayFileDimensionsFile_(file, filename);
-//             fprintf(file, "\n");
-//
-//             DisplayPerfMatrix_(file, results, results_size, idx / test_sum, MAIN_MEASUREMENT_NAME);
-//             DisplayAllMatricesIfNeeded_(file, idx / test_sum);
-//         }
-//
-//         fprintf(file, "Test %s:\n", results[idx].function_name);
-//
-//         for (size_t i = 0; i < 8; ++i) { fputs("=====", file); }
-//         fprintf(file, "\nTime measurements:\n");
-//
-//         for (size_t j = 0; j < results[idx].measurement_counter; ++j) {
-//             fprintf(file, "Measurement %lu: %s with time: %fms and %luns\n",
-//                     j,
-//                     results[idx].measurements[j].name,
-//                     (double) GetAverageTime_(&results[idx].measurements[j]) / 1e6,
-//                     GetAverageTime_(&results[idx].measurements[j])
-//             );
-//         }
-//
-//         if (!g_AppState.no_errors_flag) {
-//             for (size_t i = 0; i < 8; ++i) { fputs("=====", file); }
-//             fprintf(file, "\nErrors:\n");
-//
-//             for (size_t j = 0; j < results[idx].error_logs_counter; ++j) {
-//                 fprintf(file, "Error %lu: %s with value: %s\n", j, results[idx].error_logs[j].name,
-//                         results[idx].error_logs[j].value);
-//             }
-//         }
-//
-//         fprintf(file, "\n\n");
-//     }
-// }
+static void PrintSeparator_(std::ostream &os, const std::size_t columns) {
+    for (std::size_t idx = 0; idx < columns; ++idx) {
+        os << std::string(16, '-') << '+';
+    }
+    os << std::string(16, '-') << '\n';
+}
+
+
+static void DisplayPerfMatrix_(std::ostream &os, size_t idx, const std::string_view &name) {
+    const size_t test_sum = GetTestCount_();
+    os << "Performance Matrix for measurement " << name << "\n\n";
+
+    /* Display descriptor table */
+    os << "Descriptor table:\n";
+    std::size_t id = 0;
+    for (std::size_t i = 0; i < MAX_SOL_FUNCTIONS; ++i) {
+        if (g_ShapeFunctions[i] == nullptr) {
+            continue;
+        }
+
+        os << "Function " << (1 + id++) << g_ShapeFunctionNames[i] << '\n';
+    }
+    os << std::endl;
+
+    /* Print upper header - 16 char wide column */
+    os << " row/col        |";
+    for (std::size_t i = 0; i < test_sum; ++i) {
+        os << " " << std::setw(14) << std::right << i << " ";
+
+        if (i != test_sum - 1) {
+            os << '|';
+        }
+    }
+    os << std::endl;
+
+    PrintSeparator_(os, test_sum);
+
+    for (std::size_t i = 0; i < test_sum; ++i) {
+        /* Print left header - 16 char wide column */
+        os << " " << std::setw(14) << std::right << i << " ";
+
+        for (std::size_t ii = 0; ii < test_sum; ++ii) {
+            /* Get full time measurement */
+            const std::size_t row_idx = idx * test_sum + i;
+            const std::size_t col_idx = idx * test_sum + ii;
+
+            const bool has_row = g_AppState.results[row_idx].measurements.contains(name);
+            const bool has_col = g_AppState.results[col_idx].measurements.contains(name);
+            if (has_row && has_col) {
+                const auto &measurement_row = g_AppState.results[row_idx].measurements.at(name);
+                const auto &measurement_col = g_AppState.results[col_idx].measurements.at(name);
+                const double coef =
+                        static_cast<double>(measurement_row.GetAverageTime()) / static_cast<double>(measurement_col.
+                            GetAverageTime());
+
+                os << " " << std::setw(14) << std::fixed << std::setprecision(4) << coef << " ";
+            } else {
+                os << " " << std::setw(14) << std::right << "N/A" << " ";
+            }
+
+            if (ii != test_sum - 1) {
+                os << '|';
+            }
+        }
+        os << std::endl;
+
+        if (i != test_sum - 1) {
+            PrintSeparator_(os, test_sum);
+        }
+    }
+    os << "\n\n";
+
+    /* Print simple timetable with ms values */
+    os << "Time Table (milliseconds):\n" << " Function       |";
+    for (size_t i = 0; i < test_sum; ++i) {
+        os << " " << std::setw(14) << std::right << i << " ";
+        if (i != test_sum - 1) {
+            os << '|';
+        }
+    }
+    os << std::endl;
+
+    PrintSeparator_(os, test_sum);
+    os << " Time (ms)      |";
+
+    for (std::size_t i = 0; i < test_sum; ++i) {
+        const std::size_t result_idx = idx * test_sum + i;
+
+        if (g_AppState.results[result_idx].measurements.contains(name)) {
+            const auto &measurement = g_AppState.results[result_idx].measurements.at(name);
+            const double time_ms = static_cast<double>(measurement.GetAverageTime()) / 1e+6;
+            // Convert nanoseconds to milliseconds
+            os << " " << std::setw(14) << std::fixed << std::setprecision(3) << time_ms << " ";
+        } else {
+            os << " " << std::setw(14) << std::right << "N/A" << " ";
+        }
+
+        if (i != test_sum - 1) {
+            os << '|';
+        }
+    }
+    os << "\n\n";
+
+    /* Print data size based table */
+    os << "Number of vertices per second (1/ms):\n" << " Function       |";
+    for (std::size_t i = 0; i < test_sum; ++i) {
+        os << " " << std::setw(14) << std::right << i << " ";
+        if (i != test_sum - 1) {
+            os << '|';
+        }
+    }
+    os << std::endl;
+
+    PrintSeparator_(os, test_sum);
+    os << " Vert/ms (1/ms) |";
+
+    for (std::size_t i = 0; i < test_sum; ++i) {
+        const std::size_t result_idx = idx * test_sum + i;
+
+        if (g_AppState.results[result_idx].measurements.contains(name)) {
+            const auto &measurement = g_AppState.results[result_idx].measurements.at(name);
+            const double time_ms = static_cast<double>(measurement.GetAverageTime()) / 1e+6;
+
+            // Convert nanoseconds to milliseconds
+            const uint64_t vertices = g_AppState.input_files[idx].file_size_vertices;
+            const auto data_size = static_cast<double>(vertices);
+            const double ver_per_ms = data_size / time_ms;
+            os << " " << std::setw(14) << std::fixed << std::setprecision(3) << ver_per_ms << " ";
+        } else {
+            os << " " << std::setw(14) << std::right << "N/A" << " ";
+        }
+
+        if (i != test_sum - 1) {
+            os << '|';
+        }
+    }
+
+    std::cout << '\n' << std::endl;
+}
+
+static void DisplayAllMatricesIfNeeded_(std::ostream &os, const std::size_t idx) {
+    if (!g_AppState.detailed_flag) {
+        return;
+    }
+
+    std::vector<std::string_view> printed_matrices{};
+    const std::size_t test_sum = GetTestCount_();
+
+    for (size_t i = idx * test_sum; i < idx * test_sum + test_sum; ++i) {
+        const auto& result = g_AppState.results[i];
+
+        for (const auto &[name, measurement]: result.measurements) {
+            if (ShouldPrint_(printed_matrices, name)) {
+                DisplayPerfMatrix_(os, idx, name);
+            }
+        }
+    }
+}
+
+static void GenerateCsv_(std::ostream &os) {
+    const std::size_t test_sum = GetTestCount_();
+
+    // Generate header
+    os << "data_input,space_size,vertices,pyradiomics";
+    std::size_t custom_func_count = 0;
+    for (std::size_t i = 0; i < MAX_SOL_FUNCTIONS; ++i) {
+        if (g_ShapeFunctions[i] != nullptr) {
+            os << ',' << g_ShapeFunctionNames[i];
+            custom_func_count++;
+        }
+    }
+    os << '\n';
+
+    // Generate data rows
+    const size_t num_files = g_AppState.results.size() / test_sum;
+    for (size_t file_idx = 0; file_idx < num_files; ++file_idx) {
+        os << g_AppState.input_files[file_idx].file_name << ','
+                << g_AppState.input_files[file_idx].size_bytes << ','
+                << g_AppState.input_files[file_idx].file_size_vertices;
+
+        for (size_t test_idx = 0; test_idx < test_sum; ++test_idx) {
+            const size_t result_idx = file_idx * test_sum + test_idx;
+            const auto &result = g_AppState.results[result_idx];
+            const auto &measurement = result.measurements.at(kMainMeasurementName);
+
+            const uint64_t avg_time_ns = measurement.GetAverageTime();
+            const double time_ms = static_cast<double>(avg_time_ns) / 1e+6;
+            os << ',' << time_ms;
+        }
+        os << std::endl;
+    }
+}
+
+static void DisplayResults(std::ostream &os) {
+    const size_t test_sum = GetTestCount_();
+
+    for (size_t idx = 0; idx < g_AppState.results.size(); ++idx) {
+        if (idx % test_sum == 0) {
+            os << std::string(24 * 5, '=') << '\n';
+
+            const auto &file = g_AppState.input_files[idx / test_sum];
+            os << "Test directory: " << file.file_name << '\n';
+            DisplayFileDimensions_(os, file);
+            os << '\n';
+
+            DisplayPerfMatrix_(os, idx / test_sum, kMainMeasurementName);
+            DisplayAllMatricesIfNeeded_(os, idx / test_sum);
+        }
+
+        os << "Test " << g_AppState.results[idx].function_name << '\n'
+                << std::string(8 * 5, '=') << '\n' << "\nTime measurements:\n";
+
+        for (const auto &[name, measurement]: g_AppState.results[idx].measurements) {
+            os << "Measurement " << name << " with time: "
+                    << static_cast<double>(measurement.GetAverageTime()) / 1e6 << "ms | "
+                    << static_cast<double>(measurement.GetAverageTime()) << '\n';
+        }
+
+        if (!g_AppState.no_errors_flag) {
+            os << std::string(8 * 5, '=') << "\n\nErrors:\n";
+
+            for (std::size_t i = 0; i < g_AppState.results[idx].error_logs.size(); ++i) {
+                os << "Error " << i << ": " << g_AppState.results[idx].error_logs[i].name << " with value: "
+                        << g_AppState.results[idx].error_logs[i].value << "\n";
+            }
+        }
+
+        os << '\n' << std::endl;
+    }
+}
 
 // ------------------------------
 // Control static functions
@@ -614,8 +584,9 @@ static void RunTest_(TestFile &file) {
     const auto data = LoadNumpyArrays(file.file_name);
     assert(data); // Is verified before proceeding to tests
 
-    DisplayFileDimensions_(stdout, data);
-    file.file_size_bytes = data->size[0] * data->size[1] * data->size[2];
+    file.size = data->size;
+    file.size_bytes = file.size[0] * file.size[1] * file.size[2];
+    DisplayFileDimensions_(std::cout, file);
 
     RunTestOnDefaultFunc_(data);
     for (size_t idx = 0; idx < MAX_SOL_FUNCTIONS; ++idx) {
@@ -629,6 +600,24 @@ static void RunTest_(TestFile &file) {
         /* Ensure this run is not affecting the next one */
         CleanGPUCache();
     }
+
+    /* Deduce vertice size */
+    std::unordered_map<uint64_t, uint32_t> freq_map{};
+    for (const auto&[vertice_sizes, _] : file.size_reports) {
+        for (const auto& vert_size : vertice_sizes) {
+            freq_map[vert_size]++;
+        }
+    }
+
+    uint64_t most_accurate_vertex_size{};
+    uint64_t max_freq{};
+    for (const auto& [vertex_size, freq] : freq_map) {
+        if (freq > max_freq) {
+            max_freq = freq;
+            most_accurate_vertex_size = vertex_size;
+        }
+    }
+    file.file_size_vertices = most_accurate_vertex_size;
 }
 
 // ------------------------------
@@ -696,7 +685,7 @@ void RunTests() {
     }
 
     /* Verify working input files */
-    for (const auto& input_file : g_AppState.input_files) {
+    for (const auto &input_file: g_AppState.input_files) {
         if (!LoadNumpyArrays(input_file.file_name)) {
             FailApplication("Failed to load input file: %s", input_file.file_name.c_str());
         }
@@ -721,16 +710,19 @@ void FinalizeTesting() {
     if (!outfile.is_open()) {
         FailApplication("Unable to open output file.");
     }
-    //
-    // DisplayResults(file, g_AppState.results, g_AppState.results_counter);
-    //
-    // /* Write results to stdout */
-    // DisplayResults(stdout, g_AppState.results, g_AppState.results_counter);
-    //
-    // if (g_AppState.generate_csv) {
-    //     GenerateCsv_(csv_file, g_AppState.results, g_AppState.results_counter);
-    //     fclose(csv_file);
-    // }
+
+
+    DisplayResults(outfile);
+    DisplayResults(std::cout);
+
+    if (g_AppState.generate_csv) {
+        std::ofstream csv_file(g_AppState.output_file + ".csv");
+        if (!csv_file.is_open()) {
+            FailApplication("Unable to open csv file.");
+        }
+
+        GenerateCsv_(csv_file);
+    }
 }
 
 int IsVerbose() {
