@@ -10,6 +10,8 @@
 #include <cstring>
 #include <cmath>
 #include <iomanip>
+#include <cassert>
+#include <cinttypes>
 
 #include "debug_macros.h"
 #include "loader.h"
@@ -24,11 +26,11 @@ extern "C" int calculate_coefficients(char *mask, int *size, int *strides, doubl
 
 struct TimeMeasurement {
     std::string name{};
-    uint64_t time_ns{};
-    uint64_t total_time_ns{};
-    uint64_t retries{};
+    std::uint64_t time_ns{};
+    std::uint64_t total_time_ns{};
+    std::uint64_t retries{};
 
-    [[nodiscard]] uint64_t GetAverageTime() const {
+    [[nodiscard]] std::uint64_t GetAverageTime() const {
         return total_time_ns / retries;
     }
 };
@@ -50,15 +52,15 @@ struct TestFile {
 
     std::string file_name{};
     std::array<std::size_t, kDimensions3d> size{};
-    uint64_t size_bytes{};
-    uint64_t file_size_vertices{};
+    std::uint64_t size_bytes{};
+    std::uint64_t file_size_vertices{};
 
     struct SizeReport {
-        std::vector<uint64_t> vertice_sizes{};
+        std::vector<std::uint64_t> vertice_sizes{};
         bool mismatch_found;
     };
 
-    std::array<SizeReport, MAX_SOL_FUNCTIONS> size_reports{};
+    std::array<SizeReport, kMaxSolutionFunctions> size_reports{};
 };
 
 struct AppState {
@@ -73,7 +75,7 @@ struct AppState {
     std::vector<TestFile> input_files{};
     std::string output_file{};
     std::vector<TestResult> results{};
-    uint64_t curr_data_size{};
+    std::uint64_t curr_data_size{};
 };
 
 static constexpr auto kMainMeasurementName = "Full execution time";
@@ -227,7 +229,7 @@ static void DisplayPerfMatrix_(std::ostream &os, const std::size_t idx, const st
     /* Display descriptor table */
     os << "Descriptor table:\n";
     std::size_t id = 0;
-    for (std::size_t i = 0; i < MAX_SOL_FUNCTIONS; ++i) {
+    for (std::size_t i = 0; i < kMaxSolutionFunctions; ++i) {
         if (g_ShapeFunctions[i] == nullptr) {
             continue;
         }
@@ -336,7 +338,7 @@ static void DisplayPerfMatrix_(std::ostream &os, const std::size_t idx, const st
             const double time_ms = static_cast<double>(measurement.GetAverageTime()) / 1e+6;
 
             // Convert nanoseconds to milliseconds
-            const uint64_t vertices = g_AppState.input_files[idx].file_size_vertices;
+            const std::uint64_t vertices = g_AppState.input_files[idx].file_size_vertices;
             const auto data_size = static_cast<double>(vertices);
             const double ver_per_ms = data_size / time_ms;
             os << " " << std::setw(14) << std::fixed << std::setprecision(3) << ver_per_ms << " ";
@@ -377,7 +379,7 @@ static void GenerateCsv_(std::ostream &os) {
     // Generate header
     os << "data_input,space_size,vertices,pyradiomics";
     std::size_t custom_func_count = 0;
-    for (std::size_t i = 0; i < MAX_SOL_FUNCTIONS; ++i) {
+    for (std::size_t i = 0; i < kMaxSolutionFunctions; ++i) {
         if (g_ShapeFunctions[i] != nullptr) {
             os << ',' << g_ShapeFunctionNames[i];
             custom_func_count++;
@@ -397,7 +399,7 @@ static void GenerateCsv_(std::ostream &os) {
             const auto &result = g_AppState.results[result_idx];
             const auto &measurement = result.measurements.at(kMainMeasurementName);
 
-            const uint64_t avg_time_ns = measurement.GetAverageTime();
+            const std::uint64_t avg_time_ns = measurement.GetAverageTime();
             const double time_ms = static_cast<double>(avg_time_ns) / 1e+6;
             os << ',' << time_ms;
         }
@@ -517,7 +519,7 @@ static void RunTestOnFunc_(const std::shared_ptr<TestData> &data, const size_t i
 
     StartNewTest_("Custom implementation with idx: %lu and name \"%s\"", idx, g_ShapeFunctionNames[idx]);
 
-    for (int retry = 0; retry < g_AppState.num_rep_tests; ++retry) {
+    for (std::uint32_t retry = 0; retry < g_AppState.num_rep_tests; ++retry) {
         Result result{};
 
         StartMeasurement(kMainMeasurementName);
@@ -585,7 +587,7 @@ static void RunTest_(TestFile &file) {
     DisplayFileDimensions_(std::cout, file);
 
     RunTestOnDefaultFunc_(data);
-    for (size_t idx = 0; idx < MAX_SOL_FUNCTIONS; ++idx) {
+    for (size_t idx = 0; idx < kMaxSolutionFunctions; ++idx) {
         if (g_ShapeFunctions[idx] == nullptr) {
             continue;
         }
@@ -598,15 +600,15 @@ static void RunTest_(TestFile &file) {
     }
 
     /* Deduce vertice size */
-    std::unordered_map<uint64_t, uint32_t> freq_map{};
+    std::unordered_map<std::uint64_t, std::uint32_t> freq_map{};
     for (const auto &[vertice_sizes, _]: file.size_reports) {
         for (const auto &vert_size: vertice_sizes) {
             freq_map[vert_size]++;
         }
     }
 
-    uint64_t most_accurate_vertex_size{};
-    uint64_t max_freq{};
+    std::uint64_t most_accurate_vertex_size{};
+    std::uint64_t max_freq{};
     for (const auto &[vertex_size, freq]: freq_map) {
         if (freq > max_freq) {
             max_freq = freq;
@@ -661,7 +663,7 @@ void ParseCLI(const int argc, const char **argv) {
             if (retries <= 0) {
                 FailApplication_("Invalid number of retries specified after -r|--retries.");
             }
-            g_AppState.num_rep_tests = static_cast<uint32_t>(retries);
+            g_AppState.num_rep_tests = static_cast<std::uint32_t>(retries);
         } else if (arg == "--no-errors") {
             g_AppState.no_errors_flag = true;
         } else if (arg == "--csv") {
@@ -749,7 +751,7 @@ void EndMeasurement(const char *name) {
     assert(GetCurrentTest_().measurements.contains(name));
 
     auto &measurement = GetCurrentTest_().measurements[name];
-    const uint64_t time_spent_ns =
+    const std::uint64_t time_spent_ns =
             std::chrono::high_resolution_clock::now().time_since_epoch().count() - measurement.time_ns;
 
     measurement.total_time_ns = 0;
@@ -759,6 +761,6 @@ void EndMeasurement(const char *name) {
     TRACE_INFO("New measurement done: %s with time: %lu", name, time_spent_ns);
 }
 
-void SetDataSize(const uint64_t size) {
+void SetDataSize(const std::uint64_t size) {
     g_AppState.curr_data_size = size;
 }

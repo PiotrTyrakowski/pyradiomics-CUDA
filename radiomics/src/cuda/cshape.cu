@@ -2,7 +2,7 @@
 #include "cshape.cuh"
 #include <stdio.h>
 
-static int _IsCudaAvailable() {
+static int IsCudaAvailable_() {
     int devices = 0;
     const cudaError_t err = cudaGetDeviceCount(&devices);
 
@@ -14,8 +14,8 @@ static int _IsCudaAvailable() {
 /* Pick the best solution here */
 SOLUTION_DECL(7);
 
-int IsCudaAvailable() {
-    static const int is_available = _IsCudaAvailable();
+C_DEF int IsCudaAvailable() {
+    static const int is_available = IsCudaAvailable_();
     return is_available;
 }
 

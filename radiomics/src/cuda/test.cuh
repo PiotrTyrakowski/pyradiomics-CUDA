@@ -1,12 +1,11 @@
 #ifndef CANCERSOLVER_TEST_CUH
 #define CANCERSOLVER_TEST_CUH
 
-#include <stdlib.h>
-#include "defines.cuh"
+#include <cinttypes>
 
-#define MAX_SOL_FUNCTIONS (size_t)(32)
+static constexpr std::size_t kMaxSolutionFunctions = 32;
 
-typedef int (*shape_func_t)(
+using ShapeFunc = int (*)(
         char *mask,
         int *size,
         int *strides,
@@ -16,25 +15,12 @@ typedef int (*shape_func_t)(
         double *diameters
 );
 
-typedef int (*shape_2D_func_t)(
-        char *mask,
-        int *size,
-        int *strides,
-        double *spacing,
-        double *perimeter,
-        double *surface,
-        double *diameter
-);
+extern ShapeFunc g_ShapeFunctions[kMaxSolutionFunctions];
+extern const char* g_ShapeFunctionNames[kMaxSolutionFunctions];
 
-C_DEF void CleanGPUCache();
-C_DEF void RegisterSolutions();
-
-C_EXTERN shape_func_t g_ShapeFunctions[MAX_SOL_FUNCTIONS];
-C_EXTERN const char* g_ShapeFunctionNames[MAX_SOL_FUNCTIONS];
-
-#ifdef __cplusplus
-
-int AddShapeFunction(size_t idx, shape_func_t func, const char* name = nullptr);
+void CleanGPUCache();
+void RegisterSolutions();
+int AddShapeFunction(size_t idx, ShapeFunc func, const char* name = nullptr);
 
 #define SOLUTION_NAME(number) \
     calculate_coefficients_cuda_##number
@@ -45,7 +31,5 @@ int AddShapeFunction(size_t idx, shape_func_t func, const char* name = nullptr);
 
 #define REGISTER_SOLUTION(number, name) \
     AddShapeFunction(number, SOLUTION_NAME(number), name)
-
-#endif // __cplusplus
 
 #endif //CANCERSOLVER_TEST_CUH

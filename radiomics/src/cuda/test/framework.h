@@ -1,7 +1,6 @@
 #ifndef CANCERSOLVER_FRAMEWORK_H
 #define CANCERSOLVER_FRAMEWORK_H
 
-#include <cassert>
 #include <cinttypes>
 
 // ------------------------------
@@ -19,5 +18,6 @@ void ParseCLI(int argc, const char **argv);
 void RunTests();
 void FinalizeTesting();
 int IsVerbose();
+void SetDataSize(std::uint64_t size);
 
 #endif // CANCERSOLVER_FRAMEWORK_H
