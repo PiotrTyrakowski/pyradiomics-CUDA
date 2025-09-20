@@ -1,32 +1,31 @@
 #include "test.cuh"
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdlib>
+#include <cinttypes>
 
-shape_func_t g_ShapeFunctions[MAX_SOL_FUNCTIONS]{};
-shape_2D_func_t g_Shape2DFunctions[MAX_SOL_FUNCTIONS]{};
-const char *g_ShapeFunctionNames[MAX_SOL_FUNCTIONS]{};
+ShapeFunc g_ShapeFunctions[kMaxSolutionFunctions]{};
+const char *g_ShapeFunctionNames[kMaxSolutionFunctions]{};
 
-int AddShapeFunction(size_t idx, shape_func_t func, const char *name) {
-  if (idx >= MAX_SOL_FUNCTIONS) {
-    exit(EXIT_FAILURE);
+int AddShapeFunction(const std::size_t idx, const ShapeFunc func, const char *name) {
+  if (idx >= kMaxSolutionFunctions) {
+    std::exit(EXIT_FAILURE);
   }
 
-  if (g_ShapeFunctions[idx] != NULL) {
-    exit(EXIT_FAILURE);
+  if (g_ShapeFunctions[idx] != nullptr) {
+    std::exit(EXIT_FAILURE);
   }
 
   if (func == NULL) {
-    exit(EXIT_FAILURE);
+    std::exit(EXIT_FAILURE);
   }
 
   g_ShapeFunctions[idx] = func;
   g_ShapeFunctionNames[idx] = name ? name : "Unknown function name";
 
-  return (int)idx;
+  return static_cast<int>(idx);
 }
 
-__global__ void polluteCaches(float *buffer, size_t bufferSize) {
+__global__ void polluteCaches(float *buffer, const std::size_t bufferSize) {
   const int tid = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride = blockDim.x * gridDim.x;
 
@@ -34,15 +33,15 @@ __global__ void polluteCaches(float *buffer, size_t bufferSize) {
   const int prime2 = 67;
 
   float sum = 0.0f;
-  for (size_t i = tid; i < bufferSize; i += stride) {
-    size_t idx1 = (i * prime1) % bufferSize;
-    size_t idx2 = (i * prime2) % bufferSize;
+  for (std::size_t i = tid; i < bufferSize; i += stride) {
+    const std::size_t idx1 = (i * prime1) % bufferSize;
+    const std::size_t idx2 = (i * prime2) % bufferSize;
 
     // Read-modify-write to ensure memory operations aren't optimized away
     sum += buffer[idx1];
     buffer[idx2] = sum;
 
-    size_t idx3 = (bufferSize - 1 - i) % bufferSize;
+    const std::size_t idx3 = (bufferSize - 1 - i) % bufferSize;
     sum += buffer[idx3];
   }
 
@@ -52,7 +51,7 @@ __global__ void polluteCaches(float *buffer, size_t bufferSize) {
 }
 
 void CleanGPUCache() {
-  size_t bufferSize = 256 * 1024 * 1024 / sizeof(float);
+  const std::size_t bufferSize = 256 * 1024 * 1024 / sizeof(float);
   float *d_buffer;
   cudaMalloc(&d_buffer, bufferSize * sizeof(float));
 
@@ -64,23 +63,6 @@ void CleanGPUCache() {
   polluteCaches<<<gridSize, blockSize>>>(d_buffer, bufferSize);
   cudaDeviceSynchronize();
   cudaFree(d_buffer);
-}
-
-int AddShape2DFunction(size_t idx, shape_2D_func_t func) {
-  if (idx >= MAX_SOL_FUNCTIONS) {
-    exit(EXIT_FAILURE);
-  }
-
-  if (g_Shape2DFunctions[idx] != NULL) {
-    exit(EXIT_FAILURE);
-  }
-
-  if (func == NULL) {
-    exit(EXIT_FAILURE);
-  }
-
-  g_Shape2DFunctions[idx] = func;
-  return (int)idx;
 }
 
 SOLUTION_DECL(0);

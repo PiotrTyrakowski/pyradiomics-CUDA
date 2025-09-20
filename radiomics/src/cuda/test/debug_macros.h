@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 
-extern int IsVerbose(void);
+extern int IsVerbose();
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -16,11 +16,11 @@ extern int IsVerbose(void);
 #define TRACE_FORMAT_SUCCESS(message)  "[SUCCESS] " TRACE_FORMAT_LOCATION(message)
 
 #define TRACE(format, ...) \
-do { \
-if (IsVerbose()) { \
-printf(format __VA_OPT__(,) __VA_ARGS__); \
-} \
-} while (0)
+{ \
+    if (IsVerbose()) { \
+        printf(format __VA_OPT__(,) __VA_ARGS__); \
+    } \
+}
 
 #define TRACE_ERROR(message, ...)   TRACE(TRACE_FORMAT_ERROR(message) __VA_OPT__(,) __VA_ARGS__)
 #define TRACE_WARNING(message, ...) TRACE(TRACE_FORMAT_WARNING(message) __VA_OPT__(,) __VA_ARGS__)

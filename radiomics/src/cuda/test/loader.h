@@ -1,39 +1,40 @@
 #ifndef LOADER_H
 #define LOADER_H
 
+#include <array>
+#include <vector>
+#include <memory>
+#include <string>
+#include <optional>
+
 // ------------------------------
 // defines
 // ------------------------------
 
-#define DIAMETERS_SIZE 4
-#define EXPECTED_DIMENSION 3
+static constexpr std::size_t kDiametersSize = 4;
+static constexpr std::size_t kDimensions3d = 3;
 
-typedef struct result {
+struct Result {
     /* Results */
-
     double surface_area;
     double volume;
-    double diameters[DIAMETERS_SIZE];
-} result_t;
+    std::array<double, kDiametersSize> diameters;
+};
 
-typedef struct data {
+struct TestData {
     /* Arguments */
-    char *mask;
-    double *spacing;
+    std::vector<char> mask;
+    std::array<double, kDimensions3d> spacing;
+    std::array<size_t, kDimensions3d> size;
+    std::array<size_t, kDimensions3d> strides;
 
-    int size[EXPECTED_DIMENSION];
-    int strides[EXPECTED_DIMENSION];
-
-    unsigned char is_result_provided;
-    result_t result;
-} data_t;
-
-typedef data_t *data_ptr_t;
+    std::optional<Result> result;
+};
 
 // ------------------------------
 // Core functions
 // ------------------------------
 
-int LoadNumpyArrays(const char* filename, data_ptr_t data);
+std::shared_ptr<TestData> LoadNumpyArrays(const std::string& filename);
 
 #endif //LOADER_H

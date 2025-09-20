@@ -1,8 +1,8 @@
 #ifndef ASYNC_LAUNCHER_HPP
 #define ASYNC_LAUNCHER_HPP
 
-#include <constants.cuh>
-#include <stdio.h>
+#include <cstdio>
+#include "constants.cuh"
 #include "async_stream.cuh"
 #include "test/inline_measurment.hpp"
 #include "launcher.cuh"
@@ -21,7 +21,7 @@ int async_cuda_launcher(
 ) {
     cudaError_t cudaStatus = cudaSuccess;
 
-    START_MEASUREMENT(0, "Async launcher Marching cube stage");
+    START_MEASUREMENT("Async launcher Marching cube stage");
 
     // Initialize the async stream if not already done
     AsyncInitStreamIfNeeded();
@@ -50,43 +50,43 @@ int async_cuda_launcher(
     const size_t mask_elements = static_cast<size_t>(size[0]) * size[1] * size[2];
     const size_t mask_size_bytes = mask_elements * sizeof(char);
     const size_t num_cubes = static_cast<size_t>(size[0] - 1) * (size[1] - 1) * (size[2] - 1);
-    const size_t max_possible_vertices = (num_cubes == 0) ? 1 : num_cubes * 9;
-    const size_t vertices_bytes = max_possible_vertices * 3 * sizeof(double);
+    const size_t max_possible_vertices = (num_cubes == 0) ? 1 : num_cubes * kMaxVerticesEstimation;
+    const size_t vertices_bytes = max_possible_vertices * kVertexPosSize3D * sizeof(double);
 
     // --- 1. Allocate Pinned Host Memory ---
     CUDA_CHECK_GOTO(cudaMallocHost(reinterpret_cast<void**>(&surfaceArea_host), sizeof(double)), cleanup);
     CUDA_CHECK_GOTO(cudaMallocHost(reinterpret_cast<void**>(&volume_host), sizeof(double)), cleanup);
     CUDA_CHECK_GOTO(cudaMallocHost(reinterpret_cast<void**>(&vertex_count_host), sizeof(unsigned long long)), cleanup);
-    CUDA_CHECK_GOTO(cudaMallocHost(reinterpret_cast<void**>(&diameters_sq_host), 4 * sizeof(double)), cleanup);
+    CUDA_CHECK_GOTO(cudaMallocHost(reinterpret_cast<void**>(&diameters_sq_host), kDiametersSize3D * sizeof(double)), cleanup);
 
     // Initialize host memory
     *surfaceArea_host = 0.0;
     *volume_host = 0.0;
     *vertex_count_host = 0;
-    std::fill_n(diameters_sq_host, 4, 0.0);
+    std::fill_n(diameters_sq_host, kDiametersSize3D, 0.0);
 
     // --- 2. Allocate GPU Memory --- (using stream for async allocation if available)
     CUDA_CHECK_GOTO(cudaMallocAsync(reinterpret_cast<void**>(&mask_dev), mask_size_bytes, stream), cleanup);
-    CUDA_CHECK_GOTO(cudaMallocAsync(reinterpret_cast<void**>(&size_dev), 3 * sizeof(int), stream), cleanup);
-    CUDA_CHECK_GOTO(cudaMallocAsync(reinterpret_cast<void**>(&strides_dev), 3 * sizeof(int), stream), cleanup);
-    CUDA_CHECK_GOTO(cudaMallocAsync(reinterpret_cast<void**>(&spacing_dev), 3 * sizeof(double), stream), cleanup);
+    CUDA_CHECK_GOTO(cudaMallocAsync(reinterpret_cast<void**>(&size_dev), kVertexPosSize3D * sizeof(int), stream), cleanup);
+    CUDA_CHECK_GOTO(cudaMallocAsync(reinterpret_cast<void**>(&strides_dev), kVertexPosSize3D * sizeof(int), stream), cleanup);
+    CUDA_CHECK_GOTO(cudaMallocAsync(reinterpret_cast<void**>(&spacing_dev), kVertexPosSize3D * sizeof(double), stream), cleanup);
     CUDA_CHECK_GOTO(cudaMallocAsync(reinterpret_cast<void**>(&surfaceArea_dev), sizeof(double), stream), cleanup);
     CUDA_CHECK_GOTO(cudaMallocAsync(reinterpret_cast<void**>(&volume_dev), sizeof(double), stream), cleanup);
     CUDA_CHECK_GOTO(cudaMallocAsync(reinterpret_cast<void**>(&vertex_count_dev), sizeof(unsigned long long), stream), cleanup);
-    CUDA_CHECK_GOTO(cudaMallocAsync(reinterpret_cast<void**>(&diameters_sq_dev), 4 * sizeof(double), stream), cleanup);
+    CUDA_CHECK_GOTO(cudaMallocAsync(reinterpret_cast<void**>(&diameters_sq_dev), kDiametersSize3D * sizeof(double), stream), cleanup);
     CUDA_CHECK_GOTO(cudaMallocAsync(reinterpret_cast<void**>(&vertices_dev), vertices_bytes, stream), cleanup);
 
     // --- 3. Initialize Device Memory (Scalars to 0) --- (async operations)
     CUDA_CHECK_GOTO(cudaMemsetAsync(surfaceArea_dev, 0, sizeof(double), stream), cleanup);
     CUDA_CHECK_GOTO(cudaMemsetAsync(volume_dev, 0, sizeof(double), stream), cleanup);
     CUDA_CHECK_GOTO(cudaMemsetAsync(vertex_count_dev, 0, sizeof(unsigned long long), stream), cleanup);
-    CUDA_CHECK_GOTO(cudaMemsetAsync(diameters_sq_dev, 0, 4 * sizeof(double), stream), cleanup);
+    CUDA_CHECK_GOTO(cudaMemsetAsync(diameters_sq_dev, 0, kDiametersSize3D * sizeof(double), stream), cleanup);
 
     // --- 4. Copy Input Data from Host to Device --- (async copy operations)
     CUDA_CHECK_GOTO(cudaMemcpyAsync(mask_dev, mask, mask_size_bytes, cudaMemcpyHostToDevice, stream), cleanup);
-    CUDA_CHECK_GOTO(cudaMemcpyAsync(size_dev, size, 3 * sizeof(int), cudaMemcpyHostToDevice, stream), cleanup);
-    CUDA_CHECK_GOTO(cudaMemcpyAsync(strides_dev, strides, 3 * sizeof(int), cudaMemcpyHostToDevice, stream), cleanup);
-    CUDA_CHECK_GOTO(cudaMemcpyAsync(spacing_dev, spacing, 3 * sizeof(double), cudaMemcpyHostToDevice, stream), cleanup);
+    CUDA_CHECK_GOTO(cudaMemcpyAsync(size_dev, size, kVertexPosSize3D * sizeof(int), cudaMemcpyHostToDevice, stream), cleanup);
+    CUDA_CHECK_GOTO(cudaMemcpyAsync(strides_dev, strides, kVertexPosSize3D * sizeof(int), cudaMemcpyHostToDevice, stream), cleanup);
+    CUDA_CHECK_GOTO(cudaMemcpyAsync(spacing_dev, spacing, kVertexPosSize3D * sizeof(double), cudaMemcpyHostToDevice, stream), cleanup);
 
     // --- 5. Launch Marching Cubes Kernel ---
     if (num_cubes > 0) {
@@ -128,8 +128,8 @@ int async_cuda_launcher(
     // We need to synchronize here to ensure we have the vertex count
     CUDA_CHECK_GOTO(cudaStreamSynchronize(stream), cleanup);
 
-    END_MEASUREMENT(0);
-    START_MEASUREMENT(1, "Async launcher diameter stage");
+    END_MEASUREMENT("Async launcher Marching cube stage");
+    START_MEASUREMENT("Async launcher diameter stage");
 
     // Check if vertex buffer might have overflowed
     if (*vertex_count_host > max_possible_vertices) {
@@ -159,7 +159,7 @@ int async_cuda_launcher(
 
         // Asynchronously copy diameter results
         CUDA_CHECK_GOTO(cudaMemcpyAsync(diameters_sq_host, diameters_sq_dev,
-                                4 * sizeof(double), cudaMemcpyDeviceToHost, stream), cleanup);
+                                kDiametersSize3D * sizeof(double), cudaMemcpyDeviceToHost, stream), cleanup);
     }
 
     // Synchronize before returning results
@@ -171,11 +171,11 @@ int async_cuda_launcher(
 
     // Process diameter results
     if (*vertex_count_host > 0) {
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < kDiametersSize3D; ++i) {
             diameters[i] = sqrt(diameters_sq_host[i]);
         }
     } else {
-        std::fill_n(diameters, 4, 0.0);
+        std::fill_n(diameters, kDiametersSize3D, 0.0);
     }
 
     // --- 9. Cleanup: Free GPU and pinned host memory ---
@@ -197,7 +197,7 @@ cleanup:
     if (vertex_count_host) CUDA_CHECK_EXIT(cudaFreeHost(vertex_count_host));
     if (diameters_sq_host) CUDA_CHECK_EXIT(cudaFreeHost(diameters_sq_host));
 
-    END_MEASUREMENT(1);
+    END_MEASUREMENT("Async launcher diameter stage");
 
     return cudaStatus == cudaSuccess ? 0 : 1;
 }
@@ -255,4 +255,4 @@ cleanup:
         diameters \
     )
 
-#endif //ASYNC_LAUNCHER_HPP
+#endif // ASYNC_LAUNCHER_HPP

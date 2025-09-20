@@ -1,16 +1,13 @@
 #ifndef CSHAPE_CUH
 #define CSHAPE_CUH
 
-#ifdef __cplusplus
-#define EXTERN extern "C"
-#else
-#define EXTERN
-#endif // __cplusplus
+#include "defines.cuh"
 
-EXTERN int IsCudaAvailable();
+/* This file stands as interface to the CUDA code from pyradiomics library */
 
-EXTERN int cuda_calculate_coefficients(char *mask, int *size, int *strides, double *spacing,
+C_DEF int IsCudaAvailable();
+
+C_DEF int cuda_calculate_coefficients(char *mask, int *size, int *strides, double *spacing,
                            double *surfaceArea, double *volume, double *diameters);
-
 
 #endif //CSHAPE_CUH

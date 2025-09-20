@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.12)
-project(CancerSolver CUDA C)
+project(CancerSolver CUDA CXX C)
 
-set(CMAKE_CUDA_STANDARD 17)
-set(CMAKE_C_STANDARD 17)
+set(CMAKE_CUDA_STANDARD 20)
+set(CMAKE_CXX_STANDARD 20)
 
 # ------------------------------
 # Find Python and NumPy (Virtual Environment Priority)
@@ -83,11 +83,11 @@ target_link_libraries(PYRADIOMICS PRIVATE ${Python3_LIBRARIES})
 # C test application
 # ------------------------------
 
-file(GLOB_RECURSE C_SOURCES
-        "${CMAKE_CURRENT_SOURCE_DIR}/test/*.c"
+file(GLOB_RECURSE CXX_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp"
 )
 
-add_executable(TEST_APP ${C_SOURCES})
+add_executable(TEST_APP ${CXX_SOURCES})
 
 target_include_directories(TEST_APP PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/test"
@@ -105,11 +105,11 @@ target_link_libraries(TEST_APP PRIVATE
 # Flags config
 # ------------------------------
 
-if (CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     message(FATAL_ERROR "MSVC is unsupported...")
-elseif (CMAKE_C_COMPILER_ID STREQUAL "Clang")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     message(FATAL_ERROR "CLANG is unsupported...")
-elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     message(STATUS "Using GCC...")
 else ()
     message(FATAL_ERROR "Unsupported compiler.")
@@ -123,7 +123,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     )
 
     set_source_files_properties(
-            "${PYRADIOMICS_C};${C_SOURCES}"
+            "${PYRADIOMICS_C};${CXX_SOURCES}"
             PROPERTIES COMPILE_OPTIONS "-O3;-march=native"
     )
 
@@ -135,7 +135,7 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     )
 
     set_source_files_properties(
-            "${PYRADIOMICS_C};${C_SOURCES}"
+            "${PYRADIOMICS_C};${CXX_SOURCES}"
             PROPERTIES COMPILE_OPTIONS "-O2;-march=native;-g"
     )
 
@@ -147,7 +147,7 @@ else ()
     )
 
     set_source_files_properties(
-            "${PYRADIOMICS_C};${C_SOURCES}"
+            "${PYRADIOMICS_C};${CXX_SOURCES}"
             PROPERTIES COMPILE_OPTIONS "-O0;-g;-fno-omit-frame-pointer"
     )
 

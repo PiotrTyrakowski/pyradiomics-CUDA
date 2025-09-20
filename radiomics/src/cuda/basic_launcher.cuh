@@ -1,11 +1,13 @@
 #ifndef BASIC_LAUNCHER_CUH
 #define BASIC_LAUNCHER_CUH
+
 #include <constants.cuh>
 #include <stdio.h>
 #include <algorithm>
 #include <cmath>
 #include "launcher.cuh"
 #include "test/inline_measurment.hpp"
+#include "constants.cuh"
 
 template<class MainKernel, class DiameterKernel>
 int basic_cuda_launcher(
@@ -21,7 +23,7 @@ int basic_cuda_launcher(
 ) {
     cudaError_t cudaStatus = cudaSuccess;
 
-    START_MEASUREMENT(0, "Data transfer");
+    START_MEASUREMENT("Data transfer");
 
     // --- Device Memory Pointers ---
     char *mask_dev = nullptr;
@@ -38,39 +40,39 @@ int basic_cuda_launcher(
     double surfaceArea_host = 0.0;
     double volume_host = 0.0;
     unsigned long long vertex_count_host = 0;
-    double diameters_sq_host[4] = {0.0, 0.0, 0.0, 0.0};
+    double diameters_sq_host[kDiametersSize3D] = {0.0, 0.0, 0.0, 0.0};
 
     // --- Determine Allocation Sizes ---
     const size_t mask_elements = static_cast<size_t>(size[0]) * size[1] * size[2];
     const size_t mask_size_bytes = mask_elements * sizeof(char);
     const size_t num_cubes = static_cast<size_t>(size[0] - 1) * (size[1] - 1) * (size[2] - 1);
-    const size_t max_possible_vertices = (num_cubes == 0) ? 1 : num_cubes * 3;
-    const size_t vertices_bytes = max_possible_vertices * 3 * sizeof(double);
+    const size_t max_possible_vertices = (num_cubes == 0) ? 1 : num_cubes * kMaxVerticesEstimation;
+    const size_t vertices_bytes = max_possible_vertices * kVertexPosSize3D * sizeof(double);
 
     // --- 1. Allocate GPU Memory ---
     CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&mask_dev), mask_size_bytes), cleanup);
-    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&size_dev), 3 * sizeof(int)), cleanup);
-    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&strides_dev), 3 * sizeof(int)), cleanup);
-    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&spacing_dev), 3 * sizeof(double)), cleanup);
+    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&size_dev), kVertexPosSize3D * sizeof(int)), cleanup);
+    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&strides_dev), kVertexPosSize3D * sizeof(int)), cleanup);
+    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&spacing_dev), kVertexPosSize3D * sizeof(double)), cleanup);
     CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&surfaceArea_dev), sizeof(double)), cleanup);
     CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&volume_dev), sizeof(double)), cleanup);
     CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&vertex_count_dev), sizeof(unsigned long long)), cleanup);
-    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&diameters_sq_dev), 4 * sizeof(double)), cleanup);
+    CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&diameters_sq_dev), kDiametersSize3D * sizeof(double)), cleanup);
     CUDA_CHECK_GOTO(cudaMalloc(reinterpret_cast<void**>(&vertices_dev), vertices_bytes), cleanup);
 
     // --- 2. Initialize Device Memory (Scalars to 0) ---
     CUDA_CHECK_GOTO(cudaMemset(surfaceArea_dev, 0, sizeof(double)), cleanup);
     CUDA_CHECK_GOTO(cudaMemset(volume_dev, 0, sizeof(double)), cleanup);
     CUDA_CHECK_GOTO(cudaMemset(vertex_count_dev, 0, sizeof(unsigned long long)), cleanup);
-    CUDA_CHECK_GOTO(cudaMemset(diameters_sq_dev, 0, 4 * sizeof(double)), cleanup);
+    CUDA_CHECK_GOTO(cudaMemset(diameters_sq_dev, 0, kDiametersSize3D * sizeof(double)), cleanup);
 
     // --- 3. Copy Input Data from Host to Device ---
     CUDA_CHECK_GOTO(cudaMemcpy(mask_dev, mask, mask_size_bytes, cudaMemcpyHostToDevice), cleanup);
-    CUDA_CHECK_GOTO(cudaMemcpy(size_dev, size, 3 * sizeof(int), cudaMemcpyHostToDevice), cleanup);
-    CUDA_CHECK_GOTO(cudaMemcpy(strides_dev, strides, 3 * sizeof(int), cudaMemcpyHostToDevice), cleanup);
-    CUDA_CHECK_GOTO(cudaMemcpy(spacing_dev, spacing, 3 * sizeof(double), cudaMemcpyHostToDevice), cleanup);
+    CUDA_CHECK_GOTO(cudaMemcpy(size_dev, size, kVertexPosSize3D * sizeof(int), cudaMemcpyHostToDevice), cleanup);
+    CUDA_CHECK_GOTO(cudaMemcpy(strides_dev, strides, kVertexPosSize3D * sizeof(int), cudaMemcpyHostToDevice), cleanup);
+    CUDA_CHECK_GOTO(cudaMemcpy(spacing_dev, spacing, kVertexPosSize3D * sizeof(double), cudaMemcpyHostToDevice), cleanup);
 
-    END_MEASUREMENT(0);
+    END_MEASUREMENT("Data transfer");
 
     // --- 4. Launch Marching Cubes Kernel ---
     if (num_cubes > 0) {
@@ -80,7 +82,7 @@ int basic_cuda_launcher(
                            (size[0] - 1 + blockSize.z - 1) / blockSize.z);
 
         /* Call the main kernel */
-        START_MEASUREMENT(1, "Marching Cubes Kernel");
+        START_MEASUREMENT("Marching Cubes Kernel");
         main_kernel(
             gridSize,
             blockSize,
@@ -98,7 +100,7 @@ int basic_cuda_launcher(
         CUDA_CHECK_GOTO(cudaGetLastError(), cleanup);
         CUDA_CHECK_GOTO(cudaDeviceSynchronize(), cleanup);
 
-        END_MEASUREMENT(1);
+        END_MEASUREMENT("Marching Cubes Kernel");
     }
 
     // --- 5. Copy Results (SA, Volume, vertex count) back to Host ---
@@ -119,7 +121,7 @@ int basic_cuda_launcher(
         goto cleanup;
     }
 
-    START_MEASUREMENT(2, "Volumetric Kernel");
+    START_MEASUREMENT("Volumetric Kernel");
 
     SetDataSize(vertex_count_host);
 
@@ -140,16 +142,16 @@ int basic_cuda_launcher(
 
         CUDA_CHECK_GOTO(cudaGetLastError(), cleanup);
         CUDA_CHECK_GOTO(cudaMemcpy(diameters_sq_host, diameters_sq_dev,
-                                4 * sizeof(double), cudaMemcpyDeviceToHost), cleanup);
+                                kDiametersSize3D * sizeof(double), cudaMemcpyDeviceToHost), cleanup);
 
         // Calculate square roots for all diameters
-        std::transform(diameters_sq_host, diameters_sq_host + 4, diameters,
-                      [](double val) { return std::sqrt(val); });
+        std::transform(diameters_sq_host, diameters_sq_host + kDiametersSize3D, diameters,
+                      [](const double val) { return std::sqrt(val); });
     } else {
-        std::fill_n(diameters, 4, 0.0);
+        std::fill_n(diameters, kDiametersSize3D, 0.0);
     }
 
-    END_MEASUREMENT(2);
+    END_MEASUREMENT("Volumetric Kernel");
 
     // --- 7. Cleanup: Free GPU memory ---
 cleanup:

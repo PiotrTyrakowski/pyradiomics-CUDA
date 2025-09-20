@@ -15,8 +15,8 @@ static __global__ void ShapeKernelSharedMemorySoa(
 
     /* Load data to shared memory */
     __shared__ int8_t s_triTable[128][16];
-    __shared__ double s_vertList[12][3];
-    __shared__ int8_t s_gridAngles[8][3];
+    __shared__ double s_vertList[12][kVertexPosSize3D];
+    __shared__ int8_t s_gridAngles[8][kVertexPosSize3D];
 
     const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
     const int blockSize = blockDim.x * blockDim.y * blockDim.z;
@@ -29,16 +29,16 @@ static __global__ void ShapeKernelSharedMemorySoa(
     }
 
     // Load vertList
-    for (int i = tid; i < 12 * 3; i += blockSize) {
-        const int row = i / 3;
-        const int col = i % 3;
+    for (int i = tid; i < 12 * kVertexPosSize3D; i += blockSize) {
+        const int row = i / kVertexPosSize3D;
+        const int col = i % kVertexPosSize3D;
         s_vertList[row][col] = d_vertList[row][col];
     }
 
     // Load gridAngles
-    for (int i = tid; i < 8 * 3; i += blockSize) {
-        const int row = i / 3;
-        const int col = i % 3;
+    for (int i = tid; i < 8 * kVertexPosSize3D; i += blockSize) {
+        const int row = i / kVertexPosSize3D;
+        const int col = i % kVertexPosSize3D;
         s_gridAngles[row][col] = d_gridAngles[row][col];
     }
 
@@ -141,17 +141,17 @@ static __global__ void ShapeKernelSharedMemorySoa(
 
     int t = 0;
     // Iterate through triangles defined in d_triTable for the current cube_idx
-    while (s_triTable[cube_idx][t * 3] >= 0) {
-        double p1[3], p2[3], p3[3]; // Triangle vertex coordinates
-        double v1[3], v2[3], cross[3]; // Vectors for calculations
+    while (s_triTable[cube_idx][t * kVertexPosSize3D] >= 0) {
+        double p1[kVertexPosSize3D], p2[kVertexPosSize3D], p3[kVertexPosSize3D]; // Triangle vertex coordinates
+        double v1[kVertexPosSize3D], v2[kVertexPosSize3D], cross[kVertexPosSize3D]; // Vectors for calculations
 
         // Get vertex indices from the table
-        int v_idx_1 = s_triTable[cube_idx][t * 3];
-        int v_idx_2 = s_triTable[cube_idx][t * 3 + 1];
-        int v_idx_3 = s_triTable[cube_idx][t * 3 + 2];
+        int v_idx_1 = s_triTable[cube_idx][t * kVertexPosSize3D];
+        int v_idx_2 = s_triTable[cube_idx][t * kVertexPosSize3D + 1];
+        int v_idx_3 = s_triTable[cube_idx][t * kVertexPosSize3D + 2];
 
         // Calculate absolute coordinates for each vertex
-        for (int d = 0; d < 3; ++d) {
+        for (int d = 0; d < kVertexPosSize3D; ++d) {
             p1[d] = (((double) (d == 0 ? iz : (d == 1 ? iy : ix))) +
                      s_vertList[v_idx_1][d]) *
                     spacing[d];
@@ -170,7 +170,7 @@ static __global__ void ShapeKernelSharedMemorySoa(
         local_Vol += cross[0] * p3[0] + cross[1] * p3[1] + cross[2] * p3[2];
 
         // Surface Area contribution: 0.5 * |(p2-p1) x (p3-p1)|
-        for (int d = 0; d < 3; ++d) {
+        for (int d = 0; d < kVertexPosSize3D; ++d) {
             v1[d] = p2[d] - p1[d]; // Vector from p1 to p2
             v2[d] = p3[d] - p1[d]; // Vector from p1 to p3
         }

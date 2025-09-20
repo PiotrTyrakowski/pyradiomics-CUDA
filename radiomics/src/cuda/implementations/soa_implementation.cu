@@ -17,4 +17,4 @@ SOLUTION_DECL(5) {
         ShapeKernelSharedMemorySoa,
         VolumetryKernelBasicSoa
     );
-} 
+}
