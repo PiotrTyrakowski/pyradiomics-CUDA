@@ -690,6 +690,23 @@ void ParseCLI(const int argc, const char **argv) {
 void RunTests() {
     RegisterSolutions();
 
+    /* Verify working output file */
+    if (!std::ofstream(g_AppState.output_file).is_open()) {
+        FailApplication("Unable to open output file.");
+    }
+
+    /* Verify working input files */
+    for (const auto& input_file : g_AppState.input_files) {
+        if (!LoadNumpyArrays(input_file.file_name)) {
+            FailApplication("Failed to load input file: %s", input_file.file_name.c_str());
+        }
+    }
+
+    /* Verify working csv output if needed */
+    if (g_AppState.generate_csv && !std::ofstream(g_AppState.output_file + ".csv").is_open()) {
+        FailApplication("Failed to create csv file: %s", g_AppState.output_file + ".csv");
+    }
+
     TRACE_INFO("Running tests in verbose mode...");
     TRACE_INFO("Processing %zu input files...", g_AppState.input_files.size());
 
@@ -700,39 +717,20 @@ void RunTests() {
 
 void FinalizeTesting() {
     /* Write Result to output file */
-    FILE *file = fopen(g_AppState.output_file, "w");
-    if (file == NULL) {
-        FailApplication("Failed to open output file...");
+    std::ofstream outfile(g_AppState.output_file);
+    if (!outfile.is_open()) {
+        FailApplication("Unable to open output file.");
     }
-
-    FILE *csv_file = NULL;
-    if (g_AppState.generate_csv) {
-        char *csv_filename = (char *) malloc(strlen(g_AppState.output_file) + 5);
-        snprintf(csv_filename, strlen(g_AppState.output_file) + 5, "%s.csv", g_AppState.output_file);
-        csv_file = fopen(csv_filename, "w");
-        free(csv_filename);
-
-        if (csv_file == NULL) {
-            FailApplication("Failed to open CSV output file...");
-        }
-    }
-
-    DisplayResults(file, g_AppState.results, g_AppState.results_counter);
-
-    /* Write results to stdout */
-    DisplayResults(stdout, g_AppState.results, g_AppState.results_counter);
-
-    if (g_AppState.generate_csv) {
-        GenerateCsv_(csv_file, g_AppState.results, g_AppState.results_counter);
-        fclose(csv_file);
-    }
-
-    free(g_AppState.input_files);
-    fclose(file);
-
-    for (size_t idx = 0; idx < g_AppState.results_counter; ++idx) {
-        CleanupResults(g_AppState.results + idx);
-    }
+    //
+    // DisplayResults(file, g_AppState.results, g_AppState.results_counter);
+    //
+    // /* Write results to stdout */
+    // DisplayResults(stdout, g_AppState.results, g_AppState.results_counter);
+    //
+    // if (g_AppState.generate_csv) {
+    //     GenerateCsv_(csv_file, g_AppState.results, g_AppState.results_counter);
+    //     fclose(csv_file);
+    // }
 }
 
 int IsVerbose() {
