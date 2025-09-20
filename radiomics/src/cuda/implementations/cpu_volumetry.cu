@@ -1,8 +1,8 @@
 #include "test.cuh"
 
-#include <stdio.h>
+#include <cstdio>
 #include "launcher.cuh"
-#include <shape/basic_implementation.cuh>
+#include "shape/basic_implementation.cuh"
 #include "test/inline_measurment.hpp"
 
 static void calculate_meshDiameter(double *points, size_t stack_top, double *diameters) {

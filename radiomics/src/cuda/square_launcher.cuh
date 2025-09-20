@@ -1,7 +1,7 @@
 #ifndef SQUARE_LAUNCHER_CUH
 #define SQUARE_LAUNCHER_CUH
 
-#include <stdio.h>
+#include <cstdio>
 #include <algorithm>
 #include <cmath>
 #include "launcher.cuh"

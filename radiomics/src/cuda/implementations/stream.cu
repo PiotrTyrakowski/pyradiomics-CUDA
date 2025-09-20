@@ -27,9 +27,7 @@ cudaStream_t* GetAsyncStream() {
 
 int AsyncDestroyStreamIfNeeded() {
     if (g_AsyncStreamInitialized) {
-        cudaError_t err = cudaStreamDestroy(g_AsyncStream);
-
-        if (err != cudaSuccess) {
+        if (const cudaError_t err = cudaStreamDestroy(g_AsyncStream); err != cudaSuccess) {
             fprintf(stderr, "Error destroying CUDA stream: %s\n", cudaGetErrorString(err));
             return -1;
         }

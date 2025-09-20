@@ -1,5 +1,5 @@
-#ifndef CANCERSOLVER_TEST_CUH
-#define CANCERSOLVER_TEST_CUH
+#ifndef TEST_CUH
+#define TEST_CUH
 
 #include <cinttypes>
 
@@ -32,4 +32,4 @@ int AddShapeFunction(size_t idx, ShapeFunc func, const char* name = nullptr);
 #define REGISTER_SOLUTION(number, name) \
     AddShapeFunction(number, SOLUTION_NAME(number), name)
 
-#endif //CANCERSOLVER_TEST_CUH
+#endif //TEST_CUH
