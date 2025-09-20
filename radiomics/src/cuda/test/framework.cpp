@@ -21,7 +21,7 @@ extern "C" int calculate_coefficients(char *mask, int *size, int *strides, doubl
 // defines
 // ------------------------------
 
-struct time_measurement {
+struct TimeMeasurement {
     std::string name{};
     uint64_t time_ns{};
     uint64_t total_time_ns{};
@@ -32,43 +32,43 @@ struct time_measurement {
     }
 };
 
-struct error_log {
+struct ErrorLog {
     std::string name{};
     std::string value{};
 };
 
-struct test_result {
+struct TestResult {
     std::string function_name{};
-    std::unordered_map<std::string_view, time_measurement> measurements{};
-    std::vector<error_log> error_logs{};
+    std::unordered_map<std::string_view, TimeMeasurement> measurements{};
+    std::vector<ErrorLog> error_logs{};
 };
 
-struct test_file {
-    explicit test_file(std::string name) : file_name(std::move(name)) {
+struct TestFile {
+    explicit TestFile(std::string name) : file_name(std::move(name)) {
     }
 
     std::string file_name{};
     uint64_t file_size_bytes{};
     uint64_t file_size_vertices{};
 
-    struct size_report {
+    struct SizeReport {
         std::vector<uint64_t> vertice_sizes{};
         bool mismatch_found;
     };
 
-    std::array<size_report, MAX_SOL_FUNCTIONS> size_reports{};
+    std::array<SizeReport, MAX_SOL_FUNCTIONS> size_reports{};
 };
 
-struct app_state {
+struct AppState {
     bool verbose_flag{};
     bool detailed_flag{};
     bool no_errors_flag{};
     std::uint32_t num_rep_tests{};
     bool generate_csv{};
 
-    std::vector<test_file> input_files{};
+    std::vector<TestFile> input_files{};
     std::string output_file{};
-    std::vector<test_result> results{};
+    std::vector<TestResult> results{};
 };
 
 static constexpr auto kFilePathSeparator = "/";
@@ -79,7 +79,7 @@ static constexpr double kTestAccuracy = 0.000001;
 // Application state
 // ------------------------------
 
-app_state g_AppState = {
+AppState g_AppState = {
     .verbose_flag = false,
     .detailed_flag = false,
     .no_errors_flag = false,
@@ -100,7 +100,7 @@ static uint64_t g_DataSize = 0;
 // Helper static functions
 // ------------------------------
 
-static test_result &GetCurrentTest_() {
+static TestResult &GetCurrentTest_() {
     assert(!g_AppState.results.empty());
     return g_AppState.results.back();
 }
@@ -118,14 +118,14 @@ static void AddErrorLog(const char *name, const char *fmt, Args &&... args) {
 }
 
 template<typename... Args>
-static test_result &StartNewTest(const char *fmt, Args &&... args) {
+static TestResult &StartNewTest(const char *fmt, Args &&... args) {
     const int size = std::snprintf(nullptr, 0, fmt, std::forward<Args>(args)...);
     assert(size > 0);
 
     std::string msg(size, '\0');
     std::snprintf(msg.data(), msg.size() + 1, fmt, std::forward<Args>(args)...);
 
-    g_AppState.results.push_back(test_result(msg, {}, {}));
+    g_AppState.results.push_back(TestResult(msg, {}, {}));
     return g_AppState.results.back();
 }
 
@@ -481,7 +481,7 @@ static void DisplayFileDimensions_(FILE *file, const std::shared_ptr<TestData> &
 // Control static functions
 // ------------------------------
 
-static void ValidateResult_(const Result &result, std::shared_ptr<TestData> data) {
+static void ValidateResult_(const Result &result, const std::shared_ptr<TestData> &data) {
     assert(test_data);
 
     if (fabs(result.surface_area - data->result->surface_area) > kTestAccuracy) {
@@ -545,7 +545,7 @@ static void RunTestOnDefaultFunc_(const std::shared_ptr<TestData> &data) {
     ValidateResult_(result, data);
 }
 
-static void RunTestOnFunc_(const std::shared_ptr<TestData> &data, const size_t idx, test_file &file) {
+static void RunTestOnFunc_(const std::shared_ptr<TestData> &data, const size_t idx, TestFile &file) {
     assert(data);
     TRACE_INFO("Running test on function with idx: %lu", idx);
 
@@ -609,7 +609,7 @@ static void RunTestOnFunc_(const std::shared_ptr<TestData> &data, const size_t i
     }
 }
 
-static void RunTest_(test_file &file) {
+static void RunTest_(TestFile &file) {
     printf("Processing test for file: %s\n", file.file_name.c_str());
     const auto data = LoadNumpyArrays(file.file_name);
     assert(data); // Is verified before proceeding to tests
@@ -741,7 +741,7 @@ void StartMeasurement(const char *name) {
     if (!GetCurrentTest_().measurements.contains(name)) {
         GetCurrentTest_().measurements.emplace(
             name,
-            time_measurement(
+            TimeMeasurement(
                 name,
                 std::chrono::high_resolution_clock::now().time_since_epoch().count(),
                 0,
