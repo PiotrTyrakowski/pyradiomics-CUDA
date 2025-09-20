@@ -224,7 +224,7 @@ static void PrintSeparator_(std::ostream &os, const std::size_t columns) {
 
 static void DisplayPerfMatrix_(std::ostream &os, const std::size_t idx, const std::string_view &name) {
     const std::size_t test_sum = GetTestCount_();
-    os << "Performance Matrix for measurement " << name << "\n\n";
+    os << "Performance Matrix for measurement: \"" << name << "\"\n\n";
 
     /* Display descriptor table */
     os << "Descriptor table:\n";
@@ -234,7 +234,7 @@ static void DisplayPerfMatrix_(std::ostream &os, const std::size_t idx, const st
             continue;
         }
 
-        os << "Function " << (1 + id++) << g_ShapeFunctionNames[i] << '\n';
+        os << "Function " << (1 + id++) << " \"" << g_ShapeFunctionNames[i] << "\"\n";
     }
     os << std::endl;
 
@@ -253,7 +253,7 @@ static void DisplayPerfMatrix_(std::ostream &os, const std::size_t idx, const st
 
     for (std::size_t i = 0; i < test_sum; ++i) {
         /* Print left header - 16 char wide column */
-        os << " " << std::setw(14) << std::right << i << " ";
+        os << " " << std::setw(14) << std::right << i << " |";
 
         for (std::size_t ii = 0; ii < test_sum; ++ii) {
             /* Get full time measurement */
