@@ -1,7 +1,6 @@
 #ifndef ASYNC_LAUNCHER_HPP
 #define ASYNC_LAUNCHER_HPP
 
-#include <cstdio>
 #include "constants.cuh"
 #include "async_stream.cuh"
 #include "test/inline_measurment.hpp"

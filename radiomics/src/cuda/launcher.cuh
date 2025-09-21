@@ -1,6 +1,8 @@
 #ifndef LAUNCHER_CUH
 #define LAUNCHER_CUH
 
+#include <cstdio>
+
 #define CUDA_CHECK_GOTO(call, label) \
     do { \
         cudaStatus = call; \

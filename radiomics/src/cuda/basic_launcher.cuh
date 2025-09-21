@@ -1,13 +1,11 @@
 #ifndef BASIC_LAUNCHER_CUH
 #define BASIC_LAUNCHER_CUH
 
-#include <constants.cuh>
-#include <stdio.h>
 #include <algorithm>
-#include <cmath>
+
+#include "constants.cuh"
 #include "launcher.cuh"
 #include "test/inline_measurment.hpp"
-#include "constants.cuh"
 
 template<class MainKernel, class DiameterKernel>
 int basic_cuda_launcher(

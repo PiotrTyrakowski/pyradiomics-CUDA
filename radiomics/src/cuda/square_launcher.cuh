@@ -3,7 +3,6 @@
 
 #include <cstdio>
 #include <algorithm>
-#include <cmath>
 #include "launcher.cuh"
 #include "constants.cuh"
 #include "test/inline_measurment.hpp"
