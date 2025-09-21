@@ -14,6 +14,7 @@
 #else
 #define START_MEASUREMENT(name) (void)0
 #define END_MEASUREMENT(name) (void)0
+#define SetDataSize(x) (void)0
 #endif // ENABLE_TIME_MEASUREMENT
 
 #endif //INLINE_MEASURMENT_HPP

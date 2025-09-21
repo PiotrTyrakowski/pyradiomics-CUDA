@@ -72,10 +72,12 @@ endif()
 # ------------------------------
 
 file(GLOB_RECURSE CUDA_SOURCES "*.cu" )
-add_library(CUDA_LIB SHARED ${CUDA_SOURCES})
+add_library(CUDA_LIB STATIC ${CUDA_SOURCES})
 set_property(TARGET CUDA_LIB PROPERTY CUDA_ARCHITECTURES 60)
 target_include_directories(CUDA_LIB PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-target_compile_definitions(CUDA_LIB PRIVATE ENABLE_TIME_MEASUREMENT)
+target_link_libraries(CUDA_LIB PUBLIC CUDA::cudart_static)
+set_property(TARGET CUDA_LIB PROPERTY CUDA_RUNTIME_LIBRARY Static)
+set_property(TARGET CUDA_LIB PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # ------------------------------ 
 # Pyradiomics C
@@ -106,6 +108,7 @@ if(BUILD_TESTS)
             PYRADIOMICS
             ${Python3_LIBRARIES}
     )
+    target_compile_definitions(TEST_APP PRIVATE ENABLE_TIME_MEASUREMENT)
 endif()
 
 # ------------------------------ 

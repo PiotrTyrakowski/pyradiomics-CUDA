@@ -18,11 +18,8 @@ target_link_libraries(_cshape PRIVATE Python::NumPy)
 
 if (TARGET CUDA_LIB)
     target_link_libraries(_cshape PRIVATE CUDA_LIB)
+    target_link_libraries(_cshape PRIVATE stdc++)
     target_compile_definitions(_cshape PRIVATE CUDA_EXTENSIONS_ENABLED=1)
 endif()
 
 install(TARGETS _cmatrices _cshape DESTINATION radiomics)
-
-if (TARGET CUDA_LIB)
-    install(TARGETS CUDA_LIB DESTINATION radiomics)
-endif()
