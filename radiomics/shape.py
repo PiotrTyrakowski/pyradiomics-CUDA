@@ -50,7 +50,7 @@ class RadiomicsShape(base.RadiomicsFeaturesBase):
         raise NotImplementedError(msg)
 
     def _initSegmentBasedCalculation(self):
-        
+
         self.pixelSpacing = np.array(self.inputImage.GetSpacing()[::-1])
 
         # Pad inputMask to prevent index-out-of-range errors
@@ -86,7 +86,9 @@ class RadiomicsShape(base.RadiomicsFeaturesBase):
 
         # Compute eigenvalues and -vectors
         Np = len(self.labelledVoxelCoordinates[0])
-        coordinates = np.array(self.labelledVoxelCoordinates, dtype="int").transpose((1, 0))  # Transpose equals zip(*a)
+        coordinates = np.array(self.labelledVoxelCoordinates, dtype="int").transpose(
+            (1, 0)
+        )  # Transpose equals zip(*a)
         physicalCoordinates = coordinates * self.pixelSpacing[None, :]
         physicalCoordinates -= np.mean(physicalCoordinates, axis=0)  # Centered at 0
         physicalCoordinates /= np.sqrt(Np)
@@ -96,8 +98,11 @@ class RadiomicsShape(base.RadiomicsFeaturesBase):
         # Correct machine precision errors causing very small negative eigen values in case of some 2D segmentations
         machine_errors = np.bitwise_and(self.eigenValues < 0, self.eigenValues > -1e-10)
         if np.sum(machine_errors) > 0:
-          self.logger.warning("Encountered %d eigenvalues < 0 and > -1e-10, rounding to 0", np.sum(machine_errors))
-          self.eigenValues[machine_errors] = 0
+            self.logger.warning(
+                "Encountered %d eigenvalues < 0 and > -1e-10, rounding to 0",
+                np.sum(machine_errors),
+            )
+            self.eigenValues[machine_errors] = 0
 
         self.eigenValues.sort()  # Sort the eigenValues from small to large
 
