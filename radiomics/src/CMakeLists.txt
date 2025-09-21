@@ -6,6 +6,8 @@ if (NOT FORCE_DISABLE_CUDA)
     if (TARGET CUDA_LIB)
         set(CUDA_EXTENSIONS_ENABLED TRUE)
     endif()
+else()
+    message(STATUS "Force disabled CUDA extension...")
 endif()
 
 Python_add_library(_cmatrices MODULE _cmatrices.c cmatrices.c)
