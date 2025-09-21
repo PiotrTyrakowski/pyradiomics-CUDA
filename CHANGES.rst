@@ -192,7 +192,7 @@ Internal API
 
 - Refactor the commandline interface (`#481 <https://github.com/AIM-Harvard/pyradiomics/pull/481>`_)
 
-  - Extractor instantiated once (resulting in only 1 validation of the parameter file, outside of paralellization loop)
+  - Extractor instantiated once (resulting in only 1 validation of the parameter file, outside of parallelization loop)
   - Simplify construction of the python generator of the cases that are to be extracted
   - Remove now unnecessary functions
 
@@ -433,7 +433,7 @@ Documentation
   (`#342 <https://github.com/AIM-Harvard/pyradiomics/pull/342>`_)
 - Add documentation for the calculation of Laplacian of Gaussian.
   (`#345 <https://github.com/AIM-Harvard/pyradiomics/pull/345>`_)
-- Add refrences for the newly implemented filters
+- Add references for the newly implemented filters
   (`4464d1c <https://github.com/AIM-Harvard/pyradiomics/commit/4464d1c>`_)
 - Fix an error in the firstorder-Uniformity documentation.
   (`da7321d <https://github.com/AIM-Harvard/pyradiomics/commit/da7321d>`_)
@@ -720,7 +720,7 @@ New Parameters
   automatically extracted in 2D.
 - ``force2Ddimension``, int, range 0-2, default 0. Specifies the 'slice' dimension for a by-slice feature extraction.
   Value 0 identifies the 'z' dimension (axial plane feature extraction), and features will be extracted from the xy
-  plane. Similarly, 1 identifies the y dimension (coronal plane) and 2 the x dimension (saggital plane).
+  plane. Similarly, 1 identifies the y dimension (coronal plane) and 2 the x dimension (sagittal plane).
 - ``distances``, List of integers, default ``[1]``. This specifies the distances between the center voxel and the
   neighbor, for which angles should be generated.
 
@@ -813,7 +813,7 @@ New Parameters
 
 - ``additionalInfo`` Boolean, default ``True``. Enables additional information in the output if set to ``True``.
   (`#190 <https://github.com/AIM-Harvard/pyradiomics/pull/190>`_)
-- ``enableCExtensions`` Boolean, defailt ``True``. Enables enhanced performance for texture matrix calculation using C
+- ``enableCExtensions`` Boolean, default ``True``. Enables enhanced performance for texture matrix calculation using C
   extensions if set to ``True``. (`#202 <https://github.com/AIM-Harvard/pyradiomics/pull/202>`_)
 - ``normalize`` Boolean, default `` False``. If set to true, normalizes image before feeding it into the extraction
   pipeline. (`#209 <https://github.com/AIM-Harvard/pyradiomics/pull/209>`_)
@@ -829,11 +829,6 @@ Bug fixes
 - Unlink venv only when needed in Circle CI testing (`#199 <https://github.com/AIM-Harvard/pyradiomics/pull/199>`_)
 - Fix datatype error when calling ``SimpleITK.ResampleImageFilter.SetSize()`` (only causes error in python 3,
   `#205 <https://github.com/AIM-Harvard/pyradiomics/pull/205>`_)
-
-Requirements
-############
-
-- Add requirement for ``six>=1.10.0``, needed to make PyRadiomics compatible with both python 2 and 3.
 
 Documentation
 #############
@@ -865,8 +860,7 @@ Internal API
   feature classes and filters at initialization of the toolbox, and ensures feature classes are imported at
   initialization. (`#190 <https://github.com/AIM-Harvard/pyradiomics/pull/190>`_,
   `#198 <https://github.com/AIM-Harvard/pyradiomics/pull/198>`_)
-- Python 3 Compatibility. Add support for compatibility with python 2.7 and python >= 3.4. This is achieved using
-  package ``six``.
+- Python 3 Compatibility is required
 - Standardize function names for calculating matrices in python and with C extensions to ``_calculateMatrix`` and
   ``_calculateCMatrix``, respectively.
 - Make C code consistent with C89 convention. All variables (pointers for python objects) are initialized at top of each
@@ -931,7 +925,7 @@ Internal API
 
 - Different implementation of the various filters. No changes to calculation, but has a changed signature.
 
-  **N.B. This results in inputImages to be differently defined (different capitalization, e.g. "orginal" should now be
+  **N.B. This results in inputImages to be differently defined (different capitalization, e.g. "original" should now be
   "Original"). See documentation for definition of inputImages (featureextractor section).**
 
 ---------------

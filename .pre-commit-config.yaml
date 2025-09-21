@@ -1,0 +1,135 @@
+ci:
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+  autofix_commit_msg: "style: pre-commit fixes"
+
+exclude: ^.cruft.json|.copier-answers.yml$
+
+repos:
+  - repo: https://github.com/adamchainz/blacken-docs
+    rev: "1.19.1"
+    hooks:
+      - id: blacken-docs
+        additional_dependencies: [black==24.*]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: "v5.0.0"
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=1024']
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-toml
+      #- id: check-yaml  # See Issue #899 (https://github.com/AIM-Harvard/pyradiomics/issues/899)
+      - id: debug-statements
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        exclude: "\\.(md5|sha|sha512|svg|vtk|vtp)$|^Resources\\/[^\\/]+\\.h$|\\/ColorFiles\\/.+\\.txt$|Data\\/Input\\/.+$"
+      - id: forbid-new-submodules
+      - id: mixed-line-ending
+        exclude: "\\.(sha|sha512|svg|vtk|vtp)$"
+      #- id: name-tests-test  # See Issue #899 (https://github.com/AIM-Harvard/pyradiomics/issues/899)
+      #  args: ["--pytest-test-first"]
+      - id: requirements-txt-fixer
+      #- id: trailing-whitespace  # See Issue #899 (https://github.com/AIM-Harvard/pyradiomics/issues/899)
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    # need to keep version for black in .pre-commit-config.yaml, requirements_dev.txt, and .github/workflows/prostatid_ci.yml
+    rev: 24.2.0
+    hooks:
+      - id: black
+
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: "v1.10.0"
+    hooks:
+      #- id: rst-backticks  # See Issue #899 (https://github.com/AIM-Harvard/pyradiomics/issues/899)
+      - id: rst-directive-colons
+      - id: rst-inline-touching-normal
+
+  # See Issue #899 (https://github.com/AIM-Harvard/pyradiomics/issues/899)
+
+  #- repo: https://github.com/rbubley/mirrors-prettier
+  #  rev: "v3.4.2"
+  #  hooks:
+  #    - id: prettier
+  #      types_or: [yaml, markdown, html, css, scss, javascript, json]
+  #      args: [--prose-wrap=always]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.11.9"
+    hooks:
+      - id: ruff
+        args: ["--fix", "--show-fixes"]
+
+  #- repo: https://github.com/pre-commit/mirrors-clang-format
+  #  rev: "v19.1.7"
+  #  hooks:
+  #    - id: clang-format
+  #      types_or: [c++, c, cuda]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: "v1.15.0"
+    hooks:
+      - id: mypy
+        files: src|tests
+        # Ignore all current errors, these suppressions should be removed eventually
+        args: [ 
+          '--disable-error-code=no-redef',
+          '--disable-error-code=unreachable',
+          '--disable-error-code=assignment',
+          '--disable-error-code=index',
+          '--disable-error-code=attr-defined',
+          '--disable-error-code=no-untyped-call' , 
+          '--disable-error-code=var-annotated' ,
+          '--disable-error-code=no-untyped-def',
+          '--disable-error-code=import-not-found',
+        ]
+        additional_dependencies:
+          - pytest
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: "v2.4.1"
+    hooks:
+      - id: codespell
+        files: '^.*\.(py|c|h|md|rst|yml)$'
+        args: [ "--ignore-words", ".codespellignore" ]
+
+  - repo: https://github.com/hukkin/mdformat
+    rev: 0.7.22  # Use the ref you want to point at
+    hooks:
+    - id: mdformat
+      # Optionally add plugins
+      additional_dependencies:
+      - mdformat-gfm
+      - mdformat-black
+
+  #- repo: https://github.com/shellcheck-py/shellcheck-py
+  #  rev: "v0.10.0.1"
+  #  hooks:
+  #    - id: shellcheck
+
+  #- repo: local
+  #  hooks:
+  #    - id: disallow-caps
+  #      name: Disallow improper capitalization
+  #      language: pygrep
+  #      entry: PyBind|Numpy|Cmake|CCache|Github|PyTest
+  #      exclude: .pre-commit-config.yaml
+
+  #- repo: https://github.com/cheshirekow/cmake-format-precommit
+  #  rev: "v0.6.13"
+  #  hooks:
+  #    - id: cmake-format
+
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: "v0.23"
+    hooks:
+      - id: validate-pyproject
+        additional_dependencies: ["validate-pyproject-schema-store[all]"]
+
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: "0.31.0"
+    hooks:
+      - id: check-dependabot
+      - id: check-github-workflows
+      - id: check-readthedocs

@@ -159,7 +159,7 @@ volumetric format using `plastimatch convert <http://plastimatch.org/plastimatch
 If your label is defined in DICOM format, this can mean different things. First, check what is the modality of the
 dataset with the label. You can check that by using `dcmdump <https://support.dcmtk.org/docs/dcmdump.html>`_, and then
 checking the line that says "Modality". You can find the binary packages of this tool
-`here <https://github.com/QIICR/atom-dicom-dump#install-dcmtk-andor-gdcm>`_ (you can also use
+`here <https://github.com/QIICR/atom-dicom-dump#install-dcmtk-andor-gdcm>`__ (you can also use
 `dicom-dump package <https://github.com/QIICR/atom-dicom-dump>`_ if you want to look at DICOM files more conveniently
 from the `Atom editor <https://atom.io>`_).
 
@@ -341,7 +341,7 @@ During setup, python is unable to compile the C extensions.
 ###########################################################
 
 This can occur when no compiler is available for python. If you're installing on Windows, you can find free compilers
-for python `here <https://wiki.python.org/moin/WindowsCompilers>`_.
+for python `here <https://wiki.python.org/moin/WindowsCompilers>`__.
 
 Error loading C extensions.
 ###########################
@@ -354,7 +354,7 @@ the source code directly (i.e. runs in development mode). You can check this by 
 field, which will be something like ``['radiomics']`` when it is running in development mode and
 ``['path/to/python/Lib/site-packages']`` when running from the installed folder. If running in development mode, the C
 extensions are not available by default. To make them available in development mode, run
-``python setup.py build_ext --inplace`` from the commandline, which is similar to the ``install`` command, but just
+``python3 -m pip install .`` from the commandline, which is similar to the ``install`` command, but just
 compiles the C extensions end copies them to the source folder (making them available when running from the source tree).
 
 Miscellaneous

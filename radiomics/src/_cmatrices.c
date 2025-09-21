@@ -1,24 +1,29 @@
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#define NPY_NO_DEPRECATED_API NPY_2_1_API_VERSION
+#include <numpy/ndarrayobject.h>
 
-#include <stdlib.h>
+#if NPY_API_VERSION < NPY_2_1_API_VERSION
+#error "NUMPY less than 2.0 is not compatible with pyradiomics"
+#endif
+
+
 #include <Python.h>
-#include <numpy/arrayobject.h>
+#include <stdlib.h>
 #include "cmatrices.h"
 
-static char module_docstring[] = ("This module links to C-compiled code for efficient calculation of various matrices "
+static const char module_docstring[] = ("This module links to C-compiled code for efficient calculation of various matrices "
                                  "in the pyRadiomics package. It provides fast calculation for GLCM, GLDM, NGTDM, "
                                  "GLRLM and GLSZM. All functions are given names as follows: ""calculate_<Matrix>"", "
-                                 "where <Matrix> is the name of the matix, in lowercase. Arguments for these functions "
+                                 "where <Matrix> is the name of the matrix, in lowercase. Arguments for these functions "
                                  "are positional and start with 2-3 numpy arrays (image, mask and [distances]) and 3 integers "
                                  "(Ng number of gray levels, force2D and force2Ddimension). Optionally extra arguments "
                                  "may be required, see function docstrings for detailed information. "
                                  "Functions return a tuple with the calculated matrix and angles.");
-static char glcm_docstring[] = "Arguments: Image, Mask, Ng, force2D, for2Ddimension.";
-static char glszm_docstring[] = "Arguments: Image, Mask, Ng, Ns, force2D, for2Ddimension, matrix is cropped to maximum size encountered.";
-static char glrlm_docstring[] = "Arguments: Image, Mask, Ng, Nr, force2D, for2Ddimension.";
-static char ngtdm_docstring[] = "Arguments: Image, Mask, Ng, force2D, for2Ddimension.";
-static char gldm_docstring[] = "Arguments: Image, Mask, Ng, Alpha, force2D, for2Ddimension.";
-static char generate_angles_docstring[] = "Arguments: Boundingbox Size, distances, bidirectional, force2Ddimension.";
+static const char glcm_docstring[] = "Arguments: Image, Mask, Ng, force2D, for2Ddimension.";
+static const char glszm_docstring[] = "Arguments: Image, Mask, Ng, Ns, force2D, for2Ddimension, matrix is cropped to maximum size encountered.";
+static const char glrlm_docstring[] = "Arguments: Image, Mask, Ng, Nr, force2D, for2Ddimension.";
+static const char ngtdm_docstring[] = "Arguments: Image, Mask, Ng, force2D, for2Ddimension.";
+static const char gldm_docstring[] = "Arguments: Image, Mask, Ng, Alpha, force2D, for2Ddimension.";
+static const char generate_angles_docstring[] = "Arguments: Boundingbox Size, distances, bidirectional, force2Ddimension.";
 
 static PyObject *cmatrices_calculate_glcm(PyObject *self, PyObject *args);
 static PyObject *cmatrices_calculate_glszm(PyObject *self, PyObject *args);
@@ -27,11 +32,11 @@ static PyObject *cmatrices_calculate_ngtdm(PyObject *self, PyObject *args);
 static PyObject *cmatrices_calculate_gldm(PyObject *self, PyObject *args);
 static PyObject *cmatrices_generate_angles(PyObject *self, PyObject *args);
 
-// Function to check if array input is valid. Additionally extracts size and stride values
-int build_angles_arr(PyObject *distances_obj, PyArrayObject **angles_arr, int *size, int Nd, int force2Ddimension, int bidirectional, int *Na);
-int try_parse_arrays(PyObject *image_obj, PyObject *mask_obj, PyArrayObject **image_arr, PyArrayObject **mask_arr, int *Nd, int **size, int **strides, int mask_flags);
-int try_parse_voxels_arr(PyObject *voxels_obj, PyArrayObject **voxels_arr, int Nd, int *vox_cnt, int kernelRadius);
-void set_bb(int v, int *bb, int *size, int *voxels, int Nd, int Nvox, int kernelRadius, int force2Ddimension);
+// Function to check if array input is valid. Additionally, extracts size and stride values
+static int build_angles_arr(PyObject *distances_obj, PyArrayObject **angles_arr, int *size, int Nd, int force2Ddimension, char bidirectional, int *Na);
+static int try_parse_arrays(PyObject *image_obj, PyObject *mask_obj, PyArrayObject **image_arr, PyArrayObject **mask_arr, int *Nd, int **size, int **strides, int mask_flags);
+static int try_parse_voxels_arr(PyObject *voxels_obj, PyArrayObject **voxels_arr, int Nd, int *vox_cnt, int kernelRadius);
+static void set_bb(int v, int  * bb, int const *  size, int const *  voxels, int Nd, int Nvox, int kernelRadius, int force2Ddimension);
 
 static PyMethodDef module_methods[] = {
   //{"calculate_", cmatrices_, METH_VARARGS, _docstring},
@@ -43,8 +48,6 @@ static PyMethodDef module_methods[] = {
   { "generate_angles", cmatrices_generate_angles, METH_VARARGS, generate_angles_docstring},
   { NULL, NULL, 0, NULL }
 };
-
-#if PY_MAJOR_VERSION >= 3
 
 static struct PyModuleDef moduledef = {
   PyModuleDef_HEAD_INIT,
@@ -58,19 +61,10 @@ static struct PyModuleDef moduledef = {
   NULL,                /* m_free */
 };
 
-#endif
-
 static PyObject *
 moduleinit(void)
 {
-    PyObject *m;
-
-#if PY_MAJOR_VERSION >= 3
-    m = PyModule_Create(&moduledef);
-#else
-    m = Py_InitModule3("_cmatrices",
-                       module_methods, module_docstring);
-#endif
+    PyObject *m = PyModule_Create(&moduledef);
 
   if (!m)
       return NULL;
@@ -78,17 +72,6 @@ moduleinit(void)
   return m;
 }
 
-#if PY_MAJOR_VERSION < 3
-  PyMODINIT_FUNC
-  init_cmatrices(void)
-  {
-    // Initialize numpy functionality
-    import_array();
-
-    moduleinit();
-
-  }
-#else
   PyMODINIT_FUNC
   PyInit__cmatrices(void)
   {
@@ -97,31 +80,27 @@ moduleinit(void)
 
     return moduleinit();
   }
-#endif
 
 static PyObject *cmatrices_calculate_glcm(PyObject *self, PyObject *args)
 {
-  int Ng, force2D, force2Ddimension, kernelRadius;
-  PyObject *image_obj, *mask_obj, *distances_obj, *voxels_obj;
+  int Ng, force2D, force2Ddimension;
+
   PyArrayObject *image_arr, *mask_arr, *voxels_arr;
   int Nd, Na, Nvox;
-  int *size, *bb, *strides;
+  int *size,  *strides;
   npy_intp dims[4];
-  PyArrayObject *glcm_arr, *angles_arr;
-  int *image;
-  char *mask;
-  int *angles, *voxels;
-  double *glcm;
-  int v;
+
 
   // Initialize voxel-specific variables to default
   Nvox = 1;
-  kernelRadius = 0;
-  voxels_obj = NULL;
+
+  int kernelRadius = 0;
+  PyObject *voxels_obj = NULL;
   voxels_arr = NULL;
-  voxels = NULL;
+  int *voxels = NULL;
 
   // Parse the input tuple
+  PyObject *image_obj, *mask_obj, *distances_obj;
   if (!PyArg_ParseTuple(args, "OOOiii|iO", &image_obj, &mask_obj, &distances_obj, &Ng, &force2D, &force2Ddimension, &kernelRadius, &voxels_obj))
     return NULL;
 
@@ -146,6 +125,7 @@ static PyObject *cmatrices_calculate_glcm(PyObject *self, PyObject *args)
   // If extraction is not forced 2D, ensure the dimension is set to a non-existent one (ensuring 3D angles when possible)
   if(!force2D) force2Ddimension = -1;
 
+  PyArrayObject*angles_arr;
   if(build_angles_arr(distances_obj, &angles_arr, size, Nd, force2Ddimension, 0, &Na) < 0)
   {
     Py_XDECREF(image_arr);
@@ -157,7 +137,7 @@ static PyObject *cmatrices_calculate_glcm(PyObject *self, PyObject *args)
     return NULL;
   }
 
-  angles = (int *)PyArray_DATA(angles_arr);
+  int *angles = (int *)PyArray_DATA(angles_arr);
 
   // Initialize output array (elements not set)
   dims[0] = Nvox;
@@ -180,7 +160,7 @@ static PyObject *cmatrices_calculate_glcm(PyObject *self, PyObject *args)
     return NULL;
   }
 
-  glcm_arr = (PyArrayObject *)PyArray_SimpleNew(4, dims, NPY_DOUBLE);
+  PyArrayObject *glcm_arr= (PyArrayObject *)PyArray_SimpleNew(4, dims, NPY_DOUBLE);
   if (!glcm_arr)
   {
     Py_XDECREF(image_arr);
@@ -195,9 +175,9 @@ static PyObject *cmatrices_calculate_glcm(PyObject *self, PyObject *args)
   }
 
   // Get arrays in Ctype
-  image = (int *)PyArray_DATA(image_arr);
-  mask = (char *)PyArray_DATA(mask_arr);
-  glcm = (double *)PyArray_DATA(glcm_arr);
+  int *image = (int *)PyArray_DATA(image_arr);
+  char *mask = (char *)PyArray_DATA(mask_arr);
+  double *glcm = (double *)PyArray_DATA(glcm_arr);
   if (voxels_arr)
     voxels = (int *)PyArray_DATA(voxels_arr);
 
@@ -205,7 +185,7 @@ static PyObject *cmatrices_calculate_glcm(PyObject *self, PyObject *args)
   memset(glcm, 0, sizeof *glcm * Nvox * Ng * Ng * Na);
 
   // initialize bb
-  bb = (int *)malloc(sizeof *bb * Nd * 2);
+  int *bb = (int *)malloc(sizeof *bb * Nd * 2);
   if (!bb)
   {
     Py_XDECREF(image_arr);
@@ -220,7 +200,7 @@ static PyObject *cmatrices_calculate_glcm(PyObject *self, PyObject *args)
   }
 
   //Calculate GLCM(s)
-  for (v = 0; v < Nvox; v++)
+  for (int v = 0; v < Nvox; v++)
   {
     set_bb(v, bb, size, voxels, Nd, Nvox, kernelRadius, force2Ddimension);
 
@@ -257,16 +237,10 @@ static PyObject *cmatrices_calculate_glszm(PyObject *self, PyObject *args)
   int Ng, Ns, force2D, force2Ddimension, kernelRadius;
   PyObject *image_obj, *mask_obj, *voxels_obj;
   PyArrayObject *image_arr, *mask_arr, *voxels_arr;
-  int Na, Nd, Nvox, Nkernel;
-  int *size, *bb, *strides;
+  int Na, Nd, Nvox;
+  int *size, *strides;
   npy_intp dims[3];
-  PyArrayObject *glszm_arr, *angles_arr;
-  int *image;
-  char *mask;
-  int *angles, *voxels;
-  int *tempData;
-  int region, maxRegion;
-  double *glszm;
+
   int v;
 
   // Initialize voxel-specific variables to default
@@ -274,7 +248,8 @@ static PyObject *cmatrices_calculate_glszm(PyObject *self, PyObject *args)
   kernelRadius = 0;
   voxels_obj = NULL;
   voxels_arr = NULL;
-  voxels = NULL;
+
+  int *voxels = NULL;
 
   // Parse the input tuple
   if (!PyArg_ParseTuple(args, "OOiiii|iO", &image_obj, &mask_obj, &Ng, &Ns, &force2D, &force2Ddimension, &kernelRadius, &voxels_obj))
@@ -301,6 +276,10 @@ static PyObject *cmatrices_calculate_glszm(PyObject *self, PyObject *args)
   // If extraction is not forced 2D, ensure the dimension is set to a non-existent one (ensuring 3D angles when possible)
   if(!force2D) force2Ddimension = -1;
 
+
+  PyArrayObject *angles_arr;
+
+
   if(build_angles_arr(NULL, &angles_arr, size, Nd, force2Ddimension, 1, &Na) < 0)
   {
     Py_XDECREF(image_arr);
@@ -313,9 +292,9 @@ static PyObject *cmatrices_calculate_glszm(PyObject *self, PyObject *args)
   }
 
   // Get arrays in Ctype
-  angles = (int *)PyArray_DATA(angles_arr);
-  image = (int *)PyArray_DATA(image_arr);
-  mask = (char *)PyArray_DATA(mask_arr);
+  int *angles = (int *)PyArray_DATA(angles_arr);
+  int *image = (int *)PyArray_DATA(image_arr);
+  char *mask = (char *)PyArray_DATA(mask_arr);
   if (voxels_arr)
   {
     // Voxel based extraction, check the maximum number of potential regions
@@ -324,7 +303,7 @@ static PyObject *cmatrices_calculate_glszm(PyObject *self, PyObject *args)
     if (force2D) // Force2D is enabled, therefore subtract 1 from v (i.e. Nd - 1)
       v--;
     // For each dimension in which kernel size > 1, multiply Nkernel by the kernel size to get total kernel size.
-    Nkernel = 1;
+    int Nkernel = 1;
     for ( ; v > 0; v--)
       Nkernel *= (kernelRadius * 2 + 1);
 
@@ -340,7 +319,7 @@ static PyObject *cmatrices_calculate_glszm(PyObject *self, PyObject *args)
   // Initialize temporary output array (elements not set)
   // add +1 to the size so in the case every voxel represents a separate region,
   // tempData still contains a -1 element at the end
-  tempData = (int *)malloc(sizeof *tempData * Nvox * (2 * Ns + 1));
+  int *tempData = (int *)malloc(sizeof *tempData * Nvox * (2 * Ns + 1));
   if (!tempData)  // No memory allocated
   {
 	  Py_XDECREF(image_arr);
@@ -355,7 +334,7 @@ static PyObject *cmatrices_calculate_glszm(PyObject *self, PyObject *args)
   }
 
   // initialize bb
-  bb = (int *)malloc(sizeof *bb * Nd * 2);
+  int *bb = (int *)malloc(sizeof *bb * Nd * 2);
   if (!bb)
   {
     Py_XDECREF(image_arr);
@@ -371,13 +350,14 @@ static PyObject *cmatrices_calculate_glszm(PyObject *self, PyObject *args)
   }
 
   //Calculate GLSZM
-  maxRegion = 0;
+
+  int maxRegion = 0;
   for (v = 0; v < Nvox; v++)
   {
     set_bb(v, bb, size, voxels, Nd, Nvox, kernelRadius, force2Ddimension);
 
-    region = calculate_glszm(image, mask, size, bb, strides, angles, Na, Nd, tempData + v * (2 * Ns + 1), Ng, Ns, Nvox);
-    if (region < 0) // Error occured
+    int region = calculate_glszm(image, mask, size, bb, strides, angles, Na, Nd, tempData + v * (2 * Ns + 1), Ng, Ns, Nvox);
+    if (region < 0) // Error occurred
     {
       Py_XDECREF(image_arr);
       Py_XDECREF(mask_arr);
@@ -420,7 +400,7 @@ static PyObject *cmatrices_calculate_glszm(PyObject *self, PyObject *args)
     return NULL;
   }
 
-  glszm_arr = (PyArrayObject *)PyArray_SimpleNew(3, dims, NPY_DOUBLE);
+  PyArrayObject *glszm_arr = (PyArrayObject *)PyArray_SimpleNew(3, dims, NPY_DOUBLE);
   if (!glszm_arr)
   {
     free(tempData);
@@ -428,7 +408,7 @@ static PyObject *cmatrices_calculate_glszm(PyObject *self, PyObject *args)
     return PyErr_NoMemory();
   }
 
-  glszm = (double *)PyArray_DATA(glszm_arr);
+  double *glszm = (double *)PyArray_DATA(glszm_arr);
 
   // Set all elements to 0
   memset(glszm, 0, sizeof *glszm * Nvox * maxRegion * Ng);
@@ -455,21 +435,16 @@ static PyObject *cmatrices_calculate_glrlm(PyObject *self, PyObject *args)
   PyObject *image_obj, *mask_obj, *voxels_obj;
   PyArrayObject *image_arr, *mask_arr, *voxels_arr;
   int Nd, Na, Nvox;
-  int *size, *bb, *strides;
+  int *size, *strides;
   npy_intp dims[4];
-  PyArrayObject *glrlm_arr, *angles_arr;
-  int *image;
-  char *mask;
-  int *angles, *voxels;
-  double *glrlm;
-  int v;
+
 
   // Initialize voxel-specific variables to default
   Nvox = 1;
   kernelRadius = 0;
   voxels_obj = NULL;
   voxels_arr = NULL;
-  voxels = NULL;
+  int * voxels = NULL;
 
   // Parse the input tuple
   if (!PyArg_ParseTuple(args, "OOiiii|iO", &image_obj, &mask_obj, &Ng, &Nr, &force2D, &force2Ddimension, &kernelRadius, &voxels_obj))
@@ -496,6 +471,7 @@ static PyObject *cmatrices_calculate_glrlm(PyObject *self, PyObject *args)
   // If extraction is not forced 2D, ensure the dimension is set to a non-existent one (ensuring 3D angles when possible)
   if(!force2D) force2Ddimension = -1;
 
+  PyArrayObject *angles_arr;
   if(build_angles_arr(NULL, &angles_arr, size, Nd, force2Ddimension, 0, &Na) < 0)
   {
     Py_XDECREF(image_arr);
@@ -507,7 +483,7 @@ static PyObject *cmatrices_calculate_glrlm(PyObject *self, PyObject *args)
     return NULL;
   }
 
-  angles = (int *)PyArray_DATA(angles_arr);
+  int * angles = (int *)PyArray_DATA(angles_arr);
 
   // Initialize output array (elements not set)
   dims[0] = Nvox;
@@ -530,7 +506,7 @@ static PyObject *cmatrices_calculate_glrlm(PyObject *self, PyObject *args)
     return NULL;
   }
 
-  glrlm_arr = (PyArrayObject *)PyArray_SimpleNew(4, dims, NPY_DOUBLE);
+  PyArrayObject *glrlm_arr = (PyArrayObject *)PyArray_SimpleNew(4, dims, NPY_DOUBLE);
   if (!glrlm_arr)
   {
     Py_XDECREF(image_arr);
@@ -545,9 +521,9 @@ static PyObject *cmatrices_calculate_glrlm(PyObject *self, PyObject *args)
   }
 
   // Get arrays in Ctype
-  image = (int *)PyArray_DATA(image_arr);
-  mask = (char *)PyArray_DATA(mask_arr);
-  glrlm = (double *)PyArray_DATA(glrlm_arr);
+  int * image = (int *)PyArray_DATA(image_arr);
+  char * mask = (char *)PyArray_DATA(mask_arr);
+  double * glrlm = (double *)PyArray_DATA(glrlm_arr);
   if (voxels_arr)
     voxels = (int *)PyArray_DATA(voxels_arr);
 
@@ -555,7 +531,7 @@ static PyObject *cmatrices_calculate_glrlm(PyObject *self, PyObject *args)
   memset(glrlm, 0, sizeof *glrlm * Nvox * Ng * Nr * Na);
 
   // initialize bb
-  bb = (int *)malloc(sizeof *bb * Nd * 2);
+  int *bb = (int *)malloc(sizeof *bb * Nd * 2);
   if (!bb)
   {
     Py_XDECREF(image_arr);
@@ -571,7 +547,7 @@ static PyObject *cmatrices_calculate_glrlm(PyObject *self, PyObject *args)
   }
 
   //Calculate GLRLM
-  for (v = 0; v < Nvox; v++)
+  for (int v = 0; v < Nvox; v++)
   {
     set_bb(v, bb, size, voxels, Nd, Nvox, kernelRadius, force2Ddimension);
 
@@ -610,21 +586,16 @@ static PyObject *cmatrices_calculate_ngtdm(PyObject *self, PyObject *args)
   PyObject *image_obj, *mask_obj, *distances_obj, *voxels_obj;
   PyArrayObject *image_arr, *mask_arr, *voxels_arr;
   int Nd, Na, Nvox;
-  int *size, *bb, *strides;
+  int *size,*strides;
   npy_intp dims[3];
-  PyArrayObject *ngtdm_arr, *angles_arr;
-  int *image;
-  char *mask;
-  int *angles, *voxels;
-  double *ngtdm;
-  int v;
+
 
   // Initialize voxel-specific variables to default
   Nvox = 1;
   kernelRadius = 0;
   voxels_obj = NULL;
   voxels_arr = NULL;
-  voxels = NULL;
+  int * voxels = NULL;
 
   // Parse the input tuple
   if (!PyArg_ParseTuple(args, "OOOiii|iO", &image_obj, &mask_obj, &distances_obj, &Ng, &force2D, &force2Ddimension, &kernelRadius, &voxels_obj))
@@ -650,7 +621,7 @@ static PyObject *cmatrices_calculate_ngtdm(PyObject *self, PyObject *args)
 
   // If extraction is not forced 2D, ensure the dimension is set to a non-existent one (ensuring 3D angles when possible)
   if(!force2D) force2Ddimension = -1;
-
+  PyArrayObject *angles_arr;
   if(build_angles_arr(distances_obj, &angles_arr, size, Nd, force2Ddimension, 1, &Na) < 0)
   {
     Py_XDECREF(image_arr);
@@ -661,8 +632,7 @@ static PyObject *cmatrices_calculate_ngtdm(PyObject *self, PyObject *args)
     free(strides);
     return NULL;
   }
-
-  angles = (int *)PyArray_DATA(angles_arr);
+  int * angles = (int *)PyArray_DATA(angles_arr);
 
   // Initialize output array (elements not set)
   dims[0] = Nvox;
@@ -684,7 +654,7 @@ static PyObject *cmatrices_calculate_ngtdm(PyObject *self, PyObject *args)
     return NULL;
   }
 
-  ngtdm_arr = (PyArrayObject *)PyArray_SimpleNew(3, dims, NPY_DOUBLE);
+  PyArrayObject *ngtdm_arr = (PyArrayObject *)PyArray_SimpleNew(3, dims, NPY_DOUBLE);
   if (!ngtdm_arr)
   {
     Py_XDECREF(image_arr);
@@ -699,9 +669,9 @@ static PyObject *cmatrices_calculate_ngtdm(PyObject *self, PyObject *args)
   }
 
   // Get arrays in Ctype
-  image = (int *)PyArray_DATA(image_arr);
-  mask = (char *)PyArray_DATA(mask_arr);
-  ngtdm = (double *)PyArray_DATA(ngtdm_arr);
+  int * image = (int *)PyArray_DATA(image_arr);
+  char * mask = (char *)PyArray_DATA(mask_arr);
+  double * ngtdm = (double *)PyArray_DATA(ngtdm_arr);
   if (voxels_arr)
     voxels = (int *)PyArray_DATA(voxels_arr);
 
@@ -709,7 +679,7 @@ static PyObject *cmatrices_calculate_ngtdm(PyObject *self, PyObject *args)
   memset(ngtdm, 0, sizeof *ngtdm * Nvox * Ng * 3);
 
   // initialize bb
-  bb = (int *)malloc(sizeof *bb * Nd * 2);
+  int * bb = (int *)malloc(sizeof *bb * Nd * 2);
   if (!bb)
   {
     Py_XDECREF(image_arr);
@@ -726,7 +696,7 @@ static PyObject *cmatrices_calculate_ngtdm(PyObject *self, PyObject *args)
 
 
   //Calculate NGTDM
-  for (v = 0; v < Nvox; v++)
+  for (int v = 0; v < Nvox; v++)
   {
     set_bb(v, bb, size, voxels, Nd, Nvox, kernelRadius, force2Ddimension);
 
@@ -765,21 +735,15 @@ static PyObject *cmatrices_calculate_gldm(PyObject *self, PyObject *args)
   PyObject *image_obj, *mask_obj, *distances_obj, *voxels_obj;
   PyArrayObject *image_arr, *mask_arr, *voxels_arr;
   int Nd, Na, Nvox;
-  int *size, *bb, *strides;
+  int *size,*strides;
   npy_intp dims[3];
-  PyArrayObject *gldm_arr, *angles_arr;
-  int *image;
-  char *mask;
-  int *angles, *voxels;
-  double *gldm;
-  int v;
 
   // Initialize voxel-specific variables to default
   Nvox = 1;
   kernelRadius = 0;
   voxels_obj = NULL;
   voxels_arr = NULL;
-  voxels = NULL;
+  int * voxels = NULL;
 
   // Parse the input tuple
   if (!PyArg_ParseTuple(args, "OOOiiii|iO", &image_obj, &mask_obj, &distances_obj, &Ng, &alpha, &force2D, &force2Ddimension, &kernelRadius, &voxels_obj))
@@ -806,6 +770,7 @@ static PyObject *cmatrices_calculate_gldm(PyObject *self, PyObject *args)
   // If extraction is not forced 2D, ensure the dimension is set to a non-existent one (ensuring 3D angles when possible)
   if(!force2D) force2Ddimension = -1;
 
+  PyArrayObject *angles_arr;
   if(build_angles_arr(distances_obj, &angles_arr, size, Nd, force2Ddimension, 1, &Na) < 0)
   {
     Py_XDECREF(image_arr);
@@ -817,7 +782,7 @@ static PyObject *cmatrices_calculate_gldm(PyObject *self, PyObject *args)
     return NULL;
   }
 
-  angles = (int *)PyArray_DATA(angles_arr);
+  int * angles = (int *)PyArray_DATA(angles_arr);
 
   // Initialize output array (elements not set)
   dims[0] = Nvox;
@@ -839,7 +804,7 @@ static PyObject *cmatrices_calculate_gldm(PyObject *self, PyObject *args)
     return NULL;
   }
 
-  gldm_arr = (PyArrayObject *)PyArray_SimpleNew(3, dims, NPY_DOUBLE);
+  PyArrayObject *gldm_arr = (PyArrayObject *)PyArray_SimpleNew(3, dims, NPY_DOUBLE);
   if (!gldm_arr)
   {
     Py_XDECREF(image_arr);
@@ -854,9 +819,9 @@ static PyObject *cmatrices_calculate_gldm(PyObject *self, PyObject *args)
   }
 
   // Get arrays in Ctype
-  image = (int *)PyArray_DATA(image_arr);
-  mask = (char *)PyArray_DATA(mask_arr);
-  gldm = (double *)PyArray_DATA(gldm_arr);
+  int * image = (int *)PyArray_DATA(image_arr);
+  char * mask = (char *)PyArray_DATA(mask_arr);
+  double * gldm = (double *)PyArray_DATA(gldm_arr);
   if (voxels_arr)
     voxels = (int *)PyArray_DATA(voxels_arr);
 
@@ -864,7 +829,7 @@ static PyObject *cmatrices_calculate_gldm(PyObject *self, PyObject *args)
   memset(gldm, 0, sizeof *gldm * Nvox * Ng * (Na * 2 + 1));
 
   // initialize bb
-  bb = (int *)malloc(sizeof *bb * Nd * 2);
+  int * bb = (int *)malloc(sizeof *bb * Nd * 2);
   if (!bb)
   {
     Py_XDECREF(image_arr);
@@ -880,7 +845,7 @@ static PyObject *cmatrices_calculate_gldm(PyObject *self, PyObject *args)
   }
 
   //Calculate GLDM
-  for (v = 0; v < Nvox; v++)
+  for (int v = 0; v < Nvox; v++)
   {
     set_bb(v, bb, size, voxels, Nd, Nvox, kernelRadius, force2Ddimension);
 
@@ -917,19 +882,18 @@ static PyObject *cmatrices_calculate_gldm(PyObject *self, PyObject *args)
 static PyObject *cmatrices_generate_angles(PyObject *self, PyObject *args)
 {
   PyObject *size_obj, *distances_obj;
-  PyArrayObject *size_arr;
-  char bidirectional;
   int force2D, force2Ddimension;
-  int Nd, Na;
-  int *size;
+
+
   PyArrayObject *angles_arr;
 
   // Parse the input tuple
+  char bidirectional;
   if (!PyArg_ParseTuple(args, "OOiii", &size_obj, &distances_obj, &bidirectional, &force2D, &force2Ddimension))
     return NULL;
 
   // Interpret the size input as numpy array
-  size_arr = (PyArrayObject *)PyArray_FROM_OTF(size_obj, NPY_INT, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
+  PyArrayObject * size_arr = (PyArrayObject *)PyArray_FROM_OTF(size_obj, NPY_INT, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
 
   if (!size_arr)
     return NULL;
@@ -942,11 +906,12 @@ static PyObject *cmatrices_generate_angles(PyObject *self, PyObject *args)
     return NULL;
   }
 
-  Nd = (int)PyArray_DIM(size_arr, 0);  // Number of dimensions
-  size = (int *)PyArray_DATA(size_arr);
+  int Nd = (int)PyArray_DIM(size_arr, 0);  // Number of dimensions
+  int *size = (int *)PyArray_DATA(size_arr);
 
   if (!force2D) force2Ddimension = -1;
 
+  int Na;
   if(build_angles_arr(distances_obj, &angles_arr, size, Nd, force2Ddimension, bidirectional, &Na) < 0)
   {
     Py_XDECREF(size_arr);
@@ -958,12 +923,14 @@ static PyObject *cmatrices_generate_angles(PyObject *self, PyObject *args)
   return PyArray_Return(angles_arr);
 }
 
-int build_angles_arr(PyObject *distances_obj, PyArrayObject **angles_arr, int *size, int Nd, int force2Ddimension, int bidirectional, int *Na)
+static int build_angles_arr(PyObject *distances_obj, PyArrayObject **angles_arr, int *size, int Nd, int force2Ddimension, char bidirectional, int *Na)
 {
-  PyArrayObject *distances_arr;
-  int *distances, *angles;
+
+  int *distances;
+
   int Ndist;
   npy_intp dims[2];
+  PyArrayObject *distances_arr = NULL;
 
   if (distances_obj)
   {
@@ -975,6 +942,7 @@ int build_angles_arr(PyObject *distances_obj, PyArrayObject **angles_arr, int *s
       PyErr_SetString(PyExc_RuntimeError, "Error parsing distances array.");
       return -1;
     }
+
 
     if (PyArray_NDIM(distances_arr) != 1)
     {
@@ -1028,7 +996,7 @@ int build_angles_arr(PyObject *distances_obj, PyArrayObject **angles_arr, int *s
     PyErr_NoMemory();
     return -1;
   }
-  angles = (int *)PyArray_DATA(*angles_arr);
+  int *angles = (int *)PyArray_DATA(*angles_arr);
 
   if(build_angles(size, distances, Nd, Ndist, force2Ddimension, *Na, angles) > 0)
   {
@@ -1052,9 +1020,8 @@ int build_angles_arr(PyObject *distances_obj, PyArrayObject **angles_arr, int *s
   return 0;
 }
 
-int try_parse_arrays(PyObject *image_obj, PyObject *mask_obj, PyArrayObject **image_arr, PyArrayObject **mask_arr, int *Nd, int **size, int **strides, int mask_flags)
+static int try_parse_arrays(PyObject *image_obj, PyObject *mask_obj, PyArrayObject **image_arr, PyArrayObject **mask_arr, int *Nd, int **size, int **strides, int mask_flags)
 {
-  int d;
 
   // Interpret the image and mask objects as numpy arrays
   *image_arr = (PyArrayObject *)PyArray_FROM_OTF(image_obj, NPY_INT, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
@@ -1099,7 +1066,7 @@ int try_parse_arrays(PyObject *image_obj, PyObject *mask_obj, PyArrayObject **im
     return -1;
   }
 
-  for (d = 0; d < *Nd; d++)
+  for (int d = 0; d < *Nd; d++)
   {
     (*size)[d] = (int)PyArray_DIM(*image_arr, d);
     if ((*size)[d] != (int)PyArray_DIM(*mask_arr, d))
@@ -1117,7 +1084,7 @@ int try_parse_arrays(PyObject *image_obj, PyObject *mask_obj, PyArrayObject **im
   return 0;
 }
 
-int try_parse_voxels_arr(PyObject *voxels_obj, PyArrayObject **voxels_arr, int Nd, int *vox_cnt, int kernelRadius)
+static int try_parse_voxels_arr(PyObject *voxels_obj, PyArrayObject **voxels_arr, int Nd, int *vox_cnt, int kernelRadius)
 {
   if(voxels_obj && voxels_obj != Py_None)
   {
@@ -1150,7 +1117,7 @@ int try_parse_voxels_arr(PyObject *voxels_obj, PyArrayObject **voxels_arr, int N
   return 0;
 }
 
-void set_bb(int v, int *bb, int *size, int *voxels, int Nd, int Nvox, int kernelRadius, int force2Ddimension)
+static void set_bb(int v, int * const bb, int const * const size, int const * const voxels, int Nd, int Nvox, int kernelRadius, int force2Ddimension)
 {
   int d;
   if (voxels)

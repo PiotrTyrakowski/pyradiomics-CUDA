@@ -112,7 +112,7 @@ images must have the same dimensions and occupy the same physical space to ensur
 Progress Reporting
 ------------------
 
-When operating in full-python mode, the calculation of the texture matrices can take some time. Therefor PyRadiomics
+When operating in full-python mode, the calculation of the texture matrices can take some time. Therefore, PyRadiomics
 provides the possibility to report the progress for calculation of GLCM and GLSZM.
 This is only enabled in full-python mode when the verbosity (:py:func:`~radiomics.setVerbosity()`) is set to INFO or
 DEBUG. By default, none is provided and no progress of matrix calculation will be reported.
@@ -184,7 +184,6 @@ Using feature classes directly
 
      from radiomics import firstorder, glcm, imageoperations, shape, glrlm, glszm, getTestCase
      import SimpleITK as sitk
-     import six
      import sys, os
 
 * Set up a data directory variable::
@@ -204,17 +203,17 @@ Using feature classes directly
      firstOrderFeatures = firstorder.RadiomicsFirstOrder(image,mask)
      firstOrderFeatures.enableAllFeatures()  # On the feature class level, all features are disabled by default.
      firstOrderFeatures.calculateFeatures()
-     for (key,val) in six.iteritems(firstOrderFeatures.featureValues):
+     for (key,val) in firstOrderFeatures.featureValues.items():
        print("\t%s: %s" % (key, val))
 
 * See the :ref:`radiomics-features-label` section for more features that you can calculate.
 
-------------------------------
-Addtional points for attention
-------------------------------
+--------------------------------
+Additional points for attention
+--------------------------------
 
 Code style
-**********
+***********
 
 To keep the PyRadiomics code consistent and as readable as possible, some style rules are enforced. These are part of
 the continuous testing and implemented using flake8. See also the ``.flake8`` configuration file in the root of the
@@ -227,7 +226,7 @@ consistent with the python style for marking them as 'private', and will automat
 documentation.
 
 Documentation
-*************
+**************
 
 The documentation of PyRadiomics is auto-generated from static files contained in the ``docs`` folder and the docstrings
 of the Python code files. When a new feature class is added, this has to be added to the static file (``features.rst``)

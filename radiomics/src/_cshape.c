@@ -1,26 +1,30 @@
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#define NPY_NO_DEPRECATED_API NPY_2_1_API_VERSION
+#include <numpy/ndarrayobject.h>
+
+#if NPY_API_VERSION < NPY_2_1_API_VERSION
+#error "NUMPY less than 2.0 is not compatible with pyradiomics"
+#endif
 
 #include <stdlib.h>
 #include <Python.h>
-#include <numpy/arrayobject.h>
 #include "cshape.h"
 
 #ifdef CUDA_EXTENSIONS_ENABLED
 #include "cuda/cshape.cuh"
 #endif
 
-static char module_docstring[] = "This module links to C-compiled code for efficient calculation of the surface area "
+static const char module_docstring[] = "This module links to C-compiled code for efficient calculation of the surface area "
                                  "in the pyRadiomics package. It provides fast calculation using a marching cubes "
-                                 "algortihm, accessed via ""calculate_surfacearea"". Arguments for this function"
+                                 "algoritihm, accessed via ""calculate_surfacearea"". Arguments for this function"
                                  "are positional and consist of two numpy arrays, mask and pixelspacing, which must "
                                  "be supplied in this order. Pixelspacing is a 3 element vector containing the pixel"
                                  "spacing in z, y and x dimension, respectively. All non-zero elements in mask are "
                                  "considered to be a part of the segmentation and are included in the algorithm.";
-static char coefficients_docstring[] = "Arguments: Mask, PixelSpacing. Uses a marching cubes algorithm to calculate an "
+static const char coefficients_docstring[] = "Arguments: Mask, PixelSpacing. Uses a marching cubes algorithm to calculate an "
                                        "approximation to the total surface area, volume and maximum diameters. "
                                        "The isovalue is considered to be situated midway between a voxel that is part "
                                        "of the segmentation and a voxel that is not.";
-static char coefficients2D_docstring[] = "Arguments: Mask, PixelSpacing. Uses an adapted 2D marching cubes algorithm "
+static const char coefficients2D_docstring[] = "Arguments: Mask, PixelSpacing. Uses an adapted 2D marching cubes algorithm "
                                          "to calculate an approximation to the total perimeter, surface and maximum "
                                          "diameter. The isovalue is considered to be situated midway between a pixel "
                                          "that is part of the segmentation and a pixel that is not.";
@@ -37,7 +41,6 @@ static PyMethodDef module_methods[] = {
   { NULL, NULL, 0, NULL }
 };
 
-#if PY_MAJOR_VERSION >= 3
 
 static struct PyModuleDef moduledef = {
   PyModuleDef_HEAD_INIT,
@@ -51,19 +54,10 @@ static struct PyModuleDef moduledef = {
   NULL,                /* m_free */
 };
 
-#endif
-
 static PyObject *
 moduleinit(void)
 {
-    PyObject *m;
-
-#if PY_MAJOR_VERSION >= 3
-    m = PyModule_Create(&moduledef);
-#else
-    m = Py_InitModule3("_cshape",
-                       module_methods, module_docstring);
-#endif
+    PyObject * m = PyModule_Create(&moduledef);
 
   if (m == NULL)
       return NULL;
@@ -71,16 +65,6 @@ moduleinit(void)
   return m;
 }
 
-#if PY_MAJOR_VERSION < 3
-  PyMODINIT_FUNC
-  init_cshape(void)
-  {
-    // Initialize numpy functionality
-    import_array();
-
-    moduleinit();
-  }
-#else
   PyMODINIT_FUNC
   PyInit__cshape(void)
   {
@@ -89,19 +73,15 @@ moduleinit(void)
 
     return moduleinit();
   }
-#endif
 
 static PyObject *cshape_calculate_coefficients(PyObject *self, PyObject *args)
 {
   PyObject *mask_obj, *spacing_obj;
-  PyArrayObject *mask_arr, *spacing_arr;
   int size[3];
   int strides[3];
-  char *mask;
-  double *spacing;
+
   double SA, Volume;
   double diameters[4];
-  PyObject *diameter_obj;
   int result;
 
   // Parse the input tuple
@@ -109,14 +89,14 @@ static PyObject *cshape_calculate_coefficients(PyObject *self, PyObject *args)
     return NULL;
 
   // Interpret the input as numpy arrays
-  mask_arr = (PyArrayObject *)PyArray_FROM_OTF(mask_obj, NPY_BYTE, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
-  spacing_arr = (PyArrayObject *)PyArray_FROM_OTF(spacing_obj, NPY_DOUBLE, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
+  PyArrayObject * mask_arr = (PyArrayObject *)PyArray_FROM_OTF(mask_obj, NPY_BYTE, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
+  PyArrayObject * spacing_arr = (PyArrayObject *)PyArray_FROM_OTF(spacing_obj, NPY_DOUBLE, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
 
   if (check_arrays(mask_arr, spacing_arr, size, strides, 3) > 0) return NULL;
 
   // Get arrays in Ctype
-  mask = (char *)PyArray_DATA(mask_arr);
-  spacing = (double *)PyArray_DATA(spacing_arr);
+  char * mask = (char *)PyArray_DATA(mask_arr);
+  double *spacing = (double *)PyArray_DATA(spacing_arr);
 
   //Calculate Surface Area and volume
 #ifdef CUDA_EXTENSIONS_ENABLED
@@ -143,18 +123,17 @@ static PyObject *cshape_calculate_coefficients(PyObject *self, PyObject *args)
   Py_XDECREF(mask_arr);
   Py_XDECREF(spacing_arr);
 
-  diameter_obj = Py_BuildValue("ffff", diameters[0], diameters[1], diameters[2], diameters[3]);
+  PyObject *diameter_obj = Py_BuildValue("ffff", diameters[0], diameters[1], diameters[2], diameters[3]);
   return Py_BuildValue("ffN", SA, Volume, diameter_obj);
 }
 
 static PyObject *cshape_calculate_coefficients2D(PyObject *self, PyObject *args)
 {
   PyObject *mask_obj, *spacing_obj;
-  PyArrayObject *mask_arr, *spacing_arr;
+
   int size[2];
   int strides[2];
-  char *mask;
-  double *spacing;
+
   double perimeter, surface, diameter;
 
   // Parse the input tuple
@@ -162,14 +141,14 @@ static PyObject *cshape_calculate_coefficients2D(PyObject *self, PyObject *args)
     return NULL;
 
   // Interpret the input as numpy arrays
-  mask_arr = (PyArrayObject *)PyArray_FROM_OTF(mask_obj, NPY_BYTE, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
-  spacing_arr = (PyArrayObject *)PyArray_FROM_OTF(spacing_obj, NPY_DOUBLE, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
+  PyArrayObject *mask_arr = (PyArrayObject *)PyArray_FROM_OTF(mask_obj, NPY_BYTE, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
+  PyArrayObject *spacing_arr = (PyArrayObject *)PyArray_FROM_OTF(spacing_obj, NPY_DOUBLE, NPY_ARRAY_FORCECAST | NPY_ARRAY_IN_ARRAY);
 
   if (check_arrays(mask_arr, spacing_arr, size, strides, 2) > 0) return NULL;
 
   // Get arrays in Ctype
-  mask = (char *)PyArray_DATA(mask_arr);
-  spacing = (double *)PyArray_DATA(spacing_arr);
+  char * mask = (char *)PyArray_DATA(mask_arr);
+  double * spacing = (double *)PyArray_DATA(spacing_arr);
 
   //Calculate Surface Area and volume
   if (calculate_coefficients2D(mask, size, strides, spacing, &perimeter, &surface, &diameter))
@@ -190,8 +169,6 @@ static PyObject *cshape_calculate_coefficients2D(PyObject *self, PyObject *args)
 
 int check_arrays(PyArrayObject *mask_arr, PyArrayObject *spacing_arr, int *size, int *strides, int dimension)
 {
-  int i;
-
   if (mask_arr == NULL || spacing_arr == NULL)
   {
     Py_XDECREF(mask_arr);
@@ -225,7 +202,7 @@ int check_arrays(PyArrayObject *mask_arr, PyArrayObject *spacing_arr, int *size,
   }
 
   // Get sizes and strides of the arrays
-  for (i = 0; i < dimension; i++)
+  for (int i = 0; i < dimension; i++)
   {
     size[i] = (int)PyArray_DIM(mask_arr, i);
     strides[i] = (int)(PyArray_STRIDE(mask_arr, i) / PyArray_ITEMSIZE(mask_arr));

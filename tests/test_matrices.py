@@ -1,12 +1,12 @@
+from __future__ import annotations
+
 import logging
 import os
 
-import numpy
-import six
-
-from radiomics import getFeatureClasses, testCases
+import numpy as np
 from testUtils import RadiomicsTestUtils
 
+from radiomics import getFeatureClasses, testCases
 
 testUtils = RadiomicsTestUtils()
 
@@ -14,44 +14,52 @@ featureClasses = getFeatureClasses()
 
 
 def pytest_generate_tests(metafunc):
-  metafunc.parametrize(["testCase", "featureClassName"], metafunc.cls.generate_scenarios())
+    metafunc.parametrize(
+        ["testCase", "featureClassName"], metafunc.cls.generate_scenarios()
+    )
 
 
 class TestMatrices:
 
-  @staticmethod
-  def generate_scenarios():
-    global featureClasses
+    @staticmethod
+    def generate_scenarios():
+        for testCase in testCases:
+            if testCase.startswith("test"):
+                continue
+            for className, featureClass in featureClasses.items():
+                assert featureClass is not None
+                if "_calculateMatrix" in dir(featureClass):
+                    logging.debug("generate_scenarios: featureClass = %s", className)
+                    yield testCase, className
 
-    for testCase in testCases:
-      if testCase.startswith('test'):
-        continue
-      for className, featureClass in six.iteritems(featureClasses):
-        assert featureClass is not None
-        if "_calculateMatrix" in dir(featureClass):
-          logging.debug('generate_scenarios: featureClass = %s', className)
-          yield testCase, className
+    def test_scenario(self, testCase, featureClassName):
+        logging.debug(
+            "test_scenario: testCase = %s, featureClassName = %s",
+            testCase,
+            featureClassName,
+        )
 
-  def test_scenario(self, testCase, featureClassName):
-    global testUtils, featureClasses
+        baselineFile = os.path.join(
+            testUtils.getDataDir(),
+            "baseline",
+            f"{testCase}_{featureClassName}.npy",
+        )
+        assert os.path.isfile(baselineFile)
 
-    logging.debug('test_scenario: testCase = %s, featureClassName = %s', testCase, featureClassName)
+        baselineMatrix = np.load(baselineFile)
 
-    baselineFile = os.path.join(testUtils.getDataDir(), 'baseline', '%s_%s.npy' % (testCase, featureClassName))
-    assert os.path.isfile(baselineFile)
+        testUtils.setFeatureClassAndTestCase(featureClassName, testCase)
 
-    baselineMatrix = numpy.load(baselineFile)
+        testImage = testUtils.getImage("original")
+        testMask = testUtils.getMask("original")
 
-    testUtils.setFeatureClassAndTestCase(featureClassName, testCase)
+        featureClass = featureClasses[featureClassName](
+            testImage, testMask, **testUtils.getSettings()
+        )
+        featureClass._initCalculation()
 
-    testImage = testUtils.getImage('original')
-    testMask = testUtils.getMask('original')
+        cMat = getattr(featureClass, f"P_{featureClassName}")
+        assert cMat is not None
 
-    featureClass = featureClasses[featureClassName](testImage, testMask, **testUtils.getSettings())
-    featureClass._initCalculation()
-
-    cMat = getattr(featureClass, 'P_%s' % featureClassName)
-    assert cMat is not None
-
-    # Check if the calculated arrays match
-    assert numpy.max(numpy.abs(baselineMatrix - cMat)) < 1e-3
+        # Check if the calculated arrays match
+        assert np.max(np.abs(baselineMatrix - cMat)) < 1e-3
