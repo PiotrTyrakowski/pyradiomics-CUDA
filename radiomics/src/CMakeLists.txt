@@ -22,3 +22,7 @@ if (TARGET CUDA_LIB)
 endif()
 
 install(TARGETS _cmatrices _cshape DESTINATION radiomics)
+
+if (TARGET CUDA_LIB)
+    install(TARGETS CUDA_LIB DESTINATION radiomics)
+endif()
