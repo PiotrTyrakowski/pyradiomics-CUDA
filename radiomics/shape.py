@@ -50,42 +50,43 @@ class RadiomicsShape(base.RadiomicsFeaturesBase):
         raise NotImplementedError(msg)
 
     def _initSegmentBasedCalculation(self):
+        
         self.pixelSpacing = np.array(self.inputImage.GetSpacing()[::-1])
 
         # Pad inputMask to prevent index-out-of-range errors
-        self.logger.debug('Padding the mask with 0s')
+        self.logger.debug("Padding the mask with 0s")
 
         cpif = sitk.ConstantPadImageFilter()
 
         padding = np.tile(1, 3)
         try:
-          cpif.SetPadLowerBound(padding)
-          cpif.SetPadUpperBound(padding)
+            cpif.SetPadLowerBound(padding)
+            cpif.SetPadUpperBound(padding)
         except TypeError:
-          # newer versions of SITK/python want a tuple or list
-          cpif.SetPadLowerBound(padding.tolist())
-          cpif.SetPadUpperBound(padding.tolist())
+            # newer versions of SITK/python want a tuple or list
+            cpif.SetPadLowerBound(padding.tolist())
+            cpif.SetPadUpperBound(padding.tolist())
 
         self.inputMask = cpif.Execute(self.inputMask)
 
         # Reassign self.maskArray using the now-padded self.inputMask
-        self.maskArray = (sitk.GetArrayFromImage(self.inputMask) == self.label)
+        self.maskArray = sitk.GetArrayFromImage(self.inputMask) == self.label
         self.labelledVoxelCoordinates = np.where(self.maskArray != 0)
 
-        self.logger.debug('Pre-calculate Volume, Surface Area and Eigenvalues')
+        self.logger.debug("Pre-calculate Volume, Surface Area and Eigenvalues")
 
         maskArray_int8 = self.maskArray.astype(np.int8)
-        maskArray_copy = maskArray_int8.copy(order='C')
+        maskArray_copy = maskArray_int8.copy(order="C")
 
         pixelSpacing_float64 = self.pixelSpacing.astype(np.float64)
-        pixelSpacing_copy = pixelSpacing_float64.copy(order='C')
+        pixelSpacing_copy = pixelSpacing_float64.copy(order="C")
 
         # Compute Surface Area and volume
         self.SurfaceArea, self.Volume, self.diameters = cShape.calculate_coefficients(maskArray_copy, pixelSpacing_copy)
 
         # Compute eigenvalues and -vectors
         Np = len(self.labelledVoxelCoordinates[0])
-        coordinates = np.array(self.labelledVoxelCoordinates, dtype='int').transpose((1, 0))  # Transpose equals zip(*a)
+        coordinates = np.array(self.labelledVoxelCoordinates, dtype="int").transpose((1, 0))  # Transpose equals zip(*a)
         physicalCoordinates = coordinates * self.pixelSpacing[None, :]
         physicalCoordinates -= np.mean(physicalCoordinates, axis=0)  # Centered at 0
         physicalCoordinates /= np.sqrt(Np)
@@ -95,12 +96,12 @@ class RadiomicsShape(base.RadiomicsFeaturesBase):
         # Correct machine precision errors causing very small negative eigen values in case of some 2D segmentations
         machine_errors = np.bitwise_and(self.eigenValues < 0, self.eigenValues > -1e-10)
         if np.sum(machine_errors) > 0:
-          self.logger.warning('Encountered %d eigenvalues < 0 and > -1e-10, rounding to 0', np.sum(machine_errors))
+          self.logger.warning("Encountered %d eigenvalues < 0 and > -1e-10, rounding to 0", np.sum(machine_errors))
           self.eigenValues[machine_errors] = 0
 
         self.eigenValues.sort()  # Sort the eigenValues from small to large
 
-        self.logger.debug('Shape feature class initialized')
+        self.logger.debug("Shape feature class initialized")
 
     def getMeshVolumeFeatureValue(self):
         r"""
