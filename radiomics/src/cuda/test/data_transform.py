@@ -9,6 +9,7 @@ import numpy as np
 from radiomics import getFeatureClasses, imageoperations
 from radiomics.featureextractor import RadiomicsFeatureExtractor
 
+
 def _write_shape_class_to_file(shapeClass, out_dir, base_dir=None):
     try:
         if base_dir:
@@ -36,21 +37,23 @@ def _write_shape_class_to_file(shapeClass, out_dir, base_dir=None):
     except Exception as e:
         print(f"Error writing shape features to files: {e}")
 
+
 def load_shape_class(folder_path):
     try:
 
         if not os.path.exists(folder_path):
-            raise FileNotFoundError(f"Folder {folder_path} does not exist")
+            msg = f"Folder {folder_path} does not exist"
+            raise FileNotFoundError(msg)
 
         features = {}
 
-        with open(os.path.join(folder_path, "surface_area.txt"), "r") as f:
+        with open(os.path.join(folder_path, "surface_area.txt")) as f:
             features["surface_area"] = float(f.read())
 
-        with open(os.path.join(folder_path, "volume.txt"), "r") as f:
+        with open(os.path.join(folder_path, "volume.txt")) as f:
             features["volume"] = float(f.read())
 
-        with open(os.path.join(folder_path, "diameters.txt"), "r") as f:
+        with open(os.path.join(folder_path, "diameters.txt")) as f:
             diameters_str = f.read().strip()
             features["diameters"] = eval(diameters_str)
 
@@ -66,6 +69,7 @@ def load_shape_class(folder_path):
     except Exception as e:
         print(f"Error loading shape features from files: {e}")
         return None
+
 
 class RadiomicsFeatureWriter(RadiomicsFeatureExtractor):
     def __init__(self, base_dir=None, prefix="data"):
@@ -83,11 +87,12 @@ class RadiomicsFeatureWriter(RadiomicsFeatureExtractor):
         )
 
         Nd = mask.GetDimension()
-        if "shape" in enabledFeatures.keys():
+        if "shape" in enabledFeatures:
             if Nd != 3:
-                raise RuntimeError("Shape features are only implemented for 3D images.")
+                msg = "Shape features are only implemented for 3D images."
+                raise RuntimeError(msg)
 
-            shapeClass = getFeatureClasses()['shape'](
+            shapeClass = getFeatureClasses()["shape"](
                 croppedImage, croppedMask, **kwargs
             )
             output = _write_shape_class_to_file(
@@ -95,8 +100,9 @@ class RadiomicsFeatureWriter(RadiomicsFeatureExtractor):
             )
             self.out_dirs.append(output)
 
-        if "shape2D" in enabledFeatures.keys():
-            raise NotImplementedError("2D shape features are not implemented yet.")
+        if "shape2D" in enabledFeatures:
+            msg = "2D shape features are not implemented yet."
+            raise NotImplementedError(msg)
 
         return featureVector
 
@@ -112,6 +118,7 @@ class RadiomicsFeatureWriter(RadiomicsFeatureExtractor):
 
     def get_saved_dirs(self):
         return self.out_dirs
+
 
 DEFAULT_CONFIG = """
 {
@@ -137,6 +144,7 @@ DEFAULT_CONFIG = """
 }
 """
 
+
 def write_shape_class(
     mask_path, scan_path, max_idx, base_dir=None, config_path=None, prefix="data"
 ):
@@ -153,6 +161,7 @@ def write_shape_class(
         extractor.save_npy_files(scan_path, mask_path, val)
 
     return extractor.get_saved_dirs()
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -204,6 +213,7 @@ def parse_arguments():
     )
 
     return parser.parse_args()
+
 
 if __name__ == "__main__":
     args = parse_arguments()
