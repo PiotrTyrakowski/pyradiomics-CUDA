@@ -73,6 +73,8 @@ docs/_build/
 
 # IDE junk
 .idea/*
+*.swp
+.vscode
 
 # PyBuilder
 .pybuilder/
@@ -165,3 +167,6 @@ Thumbs.db
 
 # Ignore test outputs
 data/*.csv
+
+# Cuda tests
+tmp_cfg.json
