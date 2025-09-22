@@ -76,11 +76,6 @@ class RadiomicsShape(base.RadiomicsFeaturesBase):
         self.logger.debug("Pre-calculate Volume, Surface Area and Eigenvalues")
 
         # Volume, Surface Area and eigenvalues are pre-calculated
-        # maskArray_int8 = self.maskArray.astype(np.int8)
-        # maskArray_copy = maskArray_int8.copy(order="C")
-        #
-        # pixelSpacing_float64 = self.pixelSpacing.astype(np.float64)
-        # pixelSpacing_copy = pixelSpacing_float64.copy(order="C")
 
         # Compute Surface Area and volume
         self.SurfaceArea, self.Volume, self.diameters = cShape.calculate_coefficients(
